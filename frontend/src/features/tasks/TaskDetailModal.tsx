@@ -20,6 +20,7 @@ import {
 import { useTranslation } from '@/i18n'
 import { useTaskStore } from '@/stores'
 import type { RecurrencePattern, Subtask, TaskPriority, TaskStatus } from '@/types'
+import { getSmartDueDate } from '@/utils'
 
 interface SubtaskItemRowProps {
   subtask: Subtask
@@ -597,6 +598,14 @@ export const TaskDetailModal: React.FC = () => {
             >
               {t(`tasks.status.${status}`)}
             </span>
+
+            {/* Recurring Pill */}
+            {(task.recurring_task_id || task.is_recurring) && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
+                <i className="pi pi-sync text-[9px]" />
+                <span>{t('tasks.recurringBadge')}</span>
+              </span>
+            )}
           </div>
 
           {/* Center Tabs Switcher */}
@@ -664,6 +673,38 @@ export const TaskDetailModal: React.FC = () => {
               >
                 <i className="pi pi-times text-xs" />
               </button>
+            </div>
+          )}
+
+          {/* Recurring Task Instance Info Banner */}
+          {(task.recurring_task_id || task.is_recurring) && task.due_date && (
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-purple-200 dark:border-purple-800/60 bg-purple-50/80 dark:bg-purple-950/40 text-xs text-purple-900 dark:text-purple-200 animate-fade-in shadow-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-purple-600/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 flex items-center justify-center shrink-0">
+                  <i className="pi pi-sync text-xs" />
+                </div>
+                <div className="min-w-0">
+                  <span className="font-semibold block truncate">
+                    {t('taskDrawer.recurringInstanceBanner', {
+                      pattern: task.recurrence_pattern
+                        ? t(`taskDrawer.patterns.${task.recurrence_pattern}`)
+                        : t('tasks.recurringBadge'),
+                      date: new Date(task.due_date).toLocaleDateString(
+                        locale === 'id' ? 'id-ID' : 'en-US',
+                        {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                        }
+                      )
+                    })}
+                  </span>
+                </div>
+              </div>
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-white/80 dark:bg-slate-900/80 border border-purple-200 dark:border-purple-800/80 font-medium shrink-0">
+                {getSmartDueDate(task.due_date, locale, t).text}
+              </span>
             </div>
           )}
 

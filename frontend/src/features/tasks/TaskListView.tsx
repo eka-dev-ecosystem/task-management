@@ -5,6 +5,7 @@ import { useInfiniteTasks, useToggleFocus, useUpdateTask } from '@/hooks'
 import { useTranslation } from '@/i18n'
 import { useTaskStore } from '@/stores'
 import { compareTasks, type TaskFilterParams, type TaskPriority, type TaskStatus } from '@/types'
+import { getSmartDueDate } from '@/utils'
 
 const STATUS_CLASSES: Record<TaskStatus, string> = {
   backlog:
@@ -271,16 +272,36 @@ export const TaskListView: React.FC = () => {
                 {statusLabel}
               </span>
 
-              {/* Due Date */}
-              {!task.is_recurring && task.due_date && (
-                <span className="hidden lg:inline-flex items-center gap-1 text-[10px] text-slate-500 font-mono">
-                  <i className="pi pi-calendar text-[9px]" />
-                  {new Date(task.due_date).toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-US', {
-                    day: 'numeric',
-                    month: 'short'
-                  })}
-                </span>
-              )}
+              {/* Due Date Badge */}
+              {task.due_date && (() => {
+                const smartDate = getSmartDueDate(task.due_date, locale, t)
+                const isRecurringInstance = Boolean(task.is_recurring || task.recurring_task_id)
+                return (
+                  <span
+                    className={`hidden sm:inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-md ${
+                      smartDate.isToday
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 font-semibold'
+                        : smartDate.isTomorrow
+                          ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60'
+                          : smartDate.isOverdue && task.status !== 'done'
+                            ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
+                            : 'text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-800/50'
+                    }`}
+                    title={
+                      isRecurringInstance
+                        ? t('taskDrawer.recurringInstanceBadge', { date: smartDate.text })
+                        : undefined
+                    }
+                  >
+                    <i
+                      className={`pi ${
+                        isRecurringInstance ? 'pi-sync text-[8px]' : 'pi-calendar text-[9px]'
+                      }`}
+                    />
+                    <span>{smartDate.text}</span>
+                  </span>
+                )
+              })()}
             </div>
           </div>
         )

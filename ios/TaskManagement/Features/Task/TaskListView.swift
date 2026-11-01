@@ -960,14 +960,15 @@ struct TaskRowView: View {
                 }
 
                 Spacer()
-                if task.isRecurring != true, let due = task.dueDate {
+                if let due = task.dueDate, !due.isEmpty {
+                    let isRec = (task.isRecurring == true || task.recurringTaskId != nil)
                     HStack(spacing: 4) {
-                        Image(systemName: "calendar")
+                        Image(systemName: isRec ? "arrow.triangle.2.circlepath" : "calendar")
                             .font(.system(size: 10))
                         Text(due.prefix(10))
                             .font(.system(size: 11))
                     }
-                    .foregroundColor(AppColors.priorityHigh)
+                    .foregroundColor(isRec ? AppColors.primary : AppColors.priorityHigh)
                 }
 
                 Button(action: onSelect) {

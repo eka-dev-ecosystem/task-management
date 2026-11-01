@@ -14,5 +14,7 @@ export const common = {
   no: 'No',
   success: 'Success',
   search: 'Search',
-  clear: 'Clear'
+  clear: 'Clear',
+  today: 'Today',
+  tomorrow: 'Tomorrow'
 }

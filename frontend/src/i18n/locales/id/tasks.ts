@@ -75,6 +75,8 @@ export const taskModal = {
 export const taskDrawer = {
   taskIdBadge: 'TUGAS-{id}',
   taskAttributesTitle: 'Atribut Tugas',
+  recurringInstanceBanner: 'Tugas Rutin ({pattern}) • Instans: {date}',
+  recurringInstanceBadge: 'Instans: {date}',
   status: 'Status',
   priority: 'Prioritas',
   dueDate: 'Tenggat Waktu',

@@ -76,6 +76,8 @@ export const taskModal = {
 export const taskDrawer = {
   taskIdBadge: 'TASK-{id}',
   taskAttributesTitle: 'Task Attributes',
+  recurringInstanceBanner: 'Recurring Task ({pattern}) • Instance: {date}',
+  recurringInstanceBadge: 'Instance: {date}',
   status: 'Status',
   priority: 'Priority',
   dueDate: 'Due Date',

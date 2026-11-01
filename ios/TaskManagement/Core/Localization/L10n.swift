@@ -144,6 +144,7 @@ public enum L10n {
         public static var unitWeeks: String { "tasks.unitWeeks".localized }
         public static var unitMonths: String { "tasks.unitMonths".localized }
         public static var repeatBadge: String { "tasks.repeatBadge".localized }
+        public static var instanceDate: String { "tasks.instanceDate".localized }
         public static var quickStatus: String { "tasks.quickStatus".localized }
         public static var advanceStatus: String { "tasks.advanceStatus".localized }
         public static var revertToInProgress: String { "tasks.revertToInProgress".localized }

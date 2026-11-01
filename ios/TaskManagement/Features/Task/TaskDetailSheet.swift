@@ -50,6 +50,21 @@ public struct TaskDetailSheet: View {
                                     .foregroundColor(.purple)
                                     .clipShape(Capsule())
                                 }
+
+                                if let due = currentTask.dueDate, !due.isEmpty {
+                                    let isRec = (currentTask.isRecurring == true || currentTask.recurringTaskId != nil)
+                                    HStack(spacing: 4) {
+                                        Image(systemName: isRec ? "arrow.triangle.2.circlepath" : "calendar")
+                                            .font(.system(size: 10, weight: .semibold))
+                                        Text(due.prefix(10))
+                                            .font(.system(size: 11, weight: .semibold))
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background((isRec ? AppColors.primary : AppColors.priorityHigh).opacity(0.12))
+                                    .foregroundColor(isRec ? AppColors.primary : AppColors.priorityHigh)
+                                    .clipShape(Capsule())
+                                }
                             }
                         }
 
@@ -60,6 +75,21 @@ public struct TaskDetailSheet: View {
                                 .font(.system(size: 24))
                                 .foregroundColor(Color.secondary.opacity(0.6))
                         }
+                    }
+
+                    if (currentTask.isRecurring == true || currentTask.recurringTaskId != nil), let due = currentTask.dueDate, !due.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("\(L10n.Tasks.repeatBadge) (\(currentTask.recurrencePattern?.capitalized ?? "")) • \(L10n.Tasks.instanceDate): \(String(due.prefix(10)))")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(AppColors.primary.opacity(0.08))
+                        .foregroundColor(AppColors.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
 
                     if !currentTask.description.isEmpty {
