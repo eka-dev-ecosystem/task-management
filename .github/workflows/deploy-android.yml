@@ -3,19 +3,29 @@ name: Deploy Android (Jetpack Compose) - [MANUAL ONLY]
 # =========================================================================
 # PENTING: Workflow ini TIDAK berjalan otomatis pada push atau PR.
 # Hanya dapat di-trigger secara manual (workflow_dispatch) via tab GitHub Actions
-# jika Anda sudah siap merilis versi Android ke Play Store atau GitHub Release.
+# untuk menghasilkan APK Release (siap didownload & dipublikasikan di web portofolio)
+# atau opsional diunggah ke Google Play Console jika diinginkan.
 # =========================================================================
 on:
   workflow_dispatch:
     inputs:
-      track:
-        description: 'Google Play Store Track (internal, alpha, beta, production)'
+      build_type:
+        description: 'Tipe build Android (apk untuk distribusi web langsung, bundle, atau both)'
         required: false
-        default: 'internal'
+        default: 'apk'
+        type: choice
+        options:
+          - apk
+          - bundle
+          - both
       upload_to_play_store:
-        description: 'Upload otomatis ke Google Play Console'
+        description: 'Upload otomatis ke Google Play Console (Biarkan false untuk distribusi mandiri/web portofolio)'
         type: boolean
         default: false
+      track:
+        description: 'Google Play Store Track (Hanya jika upload_to_play_store diaktifkan)'
+        required: false
+        default: 'internal'
 
 permissions:
   contents: write
@@ -35,7 +45,7 @@ jobs:
       java_version: "17"
       module_name: app
       package_name: cloud.eka_dev.task_hub
-      build_type: both
+      build_type: ${{ inputs.build_type || 'apk' }}
       track: ${{ inputs.track || 'internal' }}
       upload_to_play_store: ${{ inputs.upload_to_play_store || false }}
       tag_prefix: "android-"
