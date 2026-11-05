@@ -310,31 +310,51 @@ export const TaskDetailModal: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const prevTaskIdRef = useRef<number | null>(null)
+  const isStatusUserModifiedRef = useRef<boolean>(false)
+
+  // Reset tracking when modal is closed
+  useEffect(() => {
+    if (!isDrawerOpen) {
+      prevTaskIdRef.current = null
+      isStatusUserModifiedRef.current = false
+    }
+  }, [isDrawerOpen])
 
   useEffect(() => {
-    if (task && task.id !== prevTaskIdRef.current) {
-      prevTaskIdRef.current = task.id
-      setTitle(task.title)
-      setTitleError(null)
-      setErrorMsg(null)
-      setDescription(task.description || '')
-      setStatus(task.status)
-      setPriority(task.priority)
-      setDueDate(task.due_date ? new Date(task.due_date) : null)
-      setProjectId(task.project_id ?? null)
-      setIsRecurring(task.is_recurring ?? false)
-      setRecurrencePattern(task.recurrence_pattern || 'daily')
-      setRecurrenceInterval(task.recurrence_interval || 1)
-      setRecurrenceEndDate(task.recurrence_end_date ? new Date(task.recurrence_end_date) : null)
-      setNewProgressNote('')
+    if (task) {
+      if (task.id !== prevTaskIdRef.current) {
+        prevTaskIdRef.current = task.id
+        isStatusUserModifiedRef.current = false
+        setTitle(task.title)
+        setTitleError(null)
+        setErrorMsg(null)
+        setDescription(task.description || '')
+        setStatus(task.status)
+        setPriority(task.priority)
+        setDueDate(task.due_date ? new Date(task.due_date) : null)
+        setProjectId(task.project_id ?? null)
+        setIsRecurring(task.is_recurring ?? false)
+        setRecurrencePattern(task.recurrence_pattern || 'daily')
+        setRecurrenceInterval(task.recurrence_interval || 1)
+        setRecurrenceEndDate(task.recurrence_end_date ? new Date(task.recurrence_end_date) : null)
+        setNewProgressNote('')
+      } else {
+        // If task ID is the same, but task.status changed externally (e.g. all subtasks completed -> auto-done, or unchecked)
+        // AND the user hasn't manually modified the status selector, sync local status to task.status!
+        if (!isStatusUserModifiedRef.current && status !== task.status) {
+          setStatus(task.status)
+        }
+      }
     }
-  }, [task])
+  }, [task, isDrawerOpen, status])
+
+  const isStatusDirty = isStatusUserModifiedRef.current && status !== task?.status
 
   const isDirty =
     Boolean(task) &&
     (title.trim() !== task!.title ||
       description !== (task!.description || '') ||
-      status !== task!.status ||
+      isStatusDirty ||
       priority !== task!.priority ||
       (dueDate ? dueDate.toISOString() : null) !==
         (task!.due_date ? new Date(task!.due_date).toISOString() : null) ||
@@ -348,6 +368,7 @@ export const TaskDetailModal: React.FC = () => {
 
   const handleResetMain = () => {
     if (!task) return
+    isStatusUserModifiedRef.current = false
     setTitle(task.title)
     setTitleError(null)
     setErrorMsg(null)
@@ -363,6 +384,7 @@ export const TaskDetailModal: React.FC = () => {
   }
 
   const handleStatusChange = (newStatus: TaskStatus) => {
+    isStatusUserModifiedRef.current = task ? newStatus !== task.status : true
     setStatus(newStatus)
     setErrorMsg(null)
   }
@@ -444,6 +466,7 @@ export const TaskDetailModal: React.FC = () => {
             isRecurring && recurrenceEndDate ? recurrenceEndDate.toISOString() : null
         }
       })
+      isStatusUserModifiedRef.current = false
     } catch (err) {
       setErrorMsg(getLocalizedErrorMessage(err, t))
     }
