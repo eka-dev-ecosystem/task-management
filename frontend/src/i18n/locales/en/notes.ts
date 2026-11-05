@@ -36,7 +36,7 @@ export const noteModal = {
   editTitle: 'Edit Idea Note',
   subtitle: 'Jot down raw thoughts, drafts, or project brain-dumps.',
   titleLabel: 'Note Title',
-  titlePlaceholder: 'e.g. Real-time websocket notification architecture',
+  titlePlaceholder: 'e.g. Weekly team brainstorm & project roadmap',
   titleRequired: 'Note title is required',
   contentLabel: 'Content / Thoughts',
   contentPlaceholder: 'Outline thoughts, reference links, code snippets...',

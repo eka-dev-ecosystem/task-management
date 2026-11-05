@@ -130,14 +130,14 @@ export default function Login() {
           <div className="space-y-2 text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-xs font-medium shadow-xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              <span>High-Velocity Engineering Workspace</span>
+              <span>Smart Productivity Workspace</span>
             </div>
             <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
-              Manage Tasks & AI Agents at the Speed of Thought
+              Manage Tasks, Projects & Notes Seamlessly
             </h2>
             <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              Designed for developers who value flow state. Native Kanban boards, instant markdown
-              notes, and Model Context Protocol (MCP) server integration.
+              Designed for effortless productivity. Visual Kanban boards, instant markdown notes,
+              and focused task tracking across all your projects.
             </p>
           </div>
 
@@ -453,11 +453,11 @@ export default function Login() {
             <span>[Esc] Home</span>
           </div>
 
-          {/* Privacy & Tenant Isolation Note */}
+          {/* Privacy Note */}
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 text-center">
             <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
               <i className="pi pi-shield text-[10px] text-emerald-500" />
-              <span>Multi-tenant encrypted workspace with isolated data storage</span>
+              <span>Secure and private workspace for all your productivity needs</span>
             </p>
           </div>
         </div>

@@ -42,7 +42,7 @@ export const taskModal = {
   createTitle: 'Create New Task',
   createSubtitle: 'Add priority goals, steps checklist, or assign due dates.',
   titleLabel: 'Task Title',
-  titlePlaceholder: 'e.g. Implement PostgreSQL distributed lock',
+  titlePlaceholder: 'e.g. Complete quarterly project review',
   descriptionLabel: 'Description',
   descriptionPlaceholder: 'Detail specifications, acceptance criteria, or context...',
   statusLabel: 'Initial Status',
@@ -203,7 +203,7 @@ export const recurring = {
   months: 'Months',
   form: {
     titleLabel: 'Template Title *',
-    titlePlaceholder: 'e.g. Daily Backend Team Standup',
+    titlePlaceholder: 'e.g. Daily Team Standup',
     titleRequired: 'Template title is required',
     descriptionLabel: 'Description',
     descriptionPlaceholder: 'Description or notes for this recurring task...',

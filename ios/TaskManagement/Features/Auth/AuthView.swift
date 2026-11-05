@@ -86,7 +86,7 @@ public struct AuthView: View {
                         // Feature highlights pill box
                         VStack(spacing: 12) {
                             FeatureHighlightRow(
-                                icon: "bolt.fill",
+                                icon: "checkmark.circle.fill",
                                 title: L10n.Auth.syncTitle,
                                 desc: L10n.Auth.syncDesc,
                                 color: AppColors.primary
@@ -191,17 +191,6 @@ public struct AuthView: View {
                             .disabled(viewModel.isLoading)
                         }
                         .padding(.horizontal, 24)
-
-                        // Footer secure indicator (clean, non-technical)
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(Color.emeraldGreen)
-                                .frame(width: 8, height: 8)
-                            Text(L10n.Auth.secure)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.top, 10)
 
                         Spacer().frame(height: 30)
                     }

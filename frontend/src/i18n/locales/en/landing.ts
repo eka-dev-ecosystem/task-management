@@ -39,10 +39,10 @@ export const landing = {
       'Universal Command Palette (Cmd + K) gives you instant access to your tasks, notes, search, and themes without leaving your keyboard.',
     speedTitle: 'Extreme High Performance',
     speedDesc:
-      'Built with React 19, Tailwind CSS v4, Go Fiber, and Redis. Sub-millisecond local latency with seamless cloud synchronization.',
+      'Engineered for maximum responsiveness. Instant interaction latency with seamless real-time cloud synchronization.',
     securityTitle: 'Secure Multi-Tenant Auth',
     securityDesc:
-      'Google GIS One-Tap, Apple Sign-In with private relay, cryptographic token verification, and complete user data isolation.'
+      'Google and Apple Sign-In with encrypted session tokens and complete user privacy.'
   },
 
   comparison: {

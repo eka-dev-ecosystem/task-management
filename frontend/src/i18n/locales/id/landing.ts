@@ -41,10 +41,10 @@ export const landing: typeof EnLanding = {
       'Command Palette universal (Cmd + K) memberikan akses secepat kilat ke pencarian tugas, catatan, dan tema tanpa melepas tangan dari keyboard.',
     speedTitle: 'Performa Super Cepat',
     speedDesc:
-      'Dibangun dengan React 19, Tailwind CSS v4, Go Fiber, dan Redis. Respon antarmuka secepat kilat dengan sinkronisasi cloud real-time.',
+      'Dirancang untuk responsivitas maksimal. Interaksi instan dengan sinkronisasi cloud real-time yang mulus.',
     securityTitle: 'Keamanan Multi-Tenant Terisolasi',
     securityDesc:
-      'Dukungan Google GIS One-Tap, Apple Sign-In dengan private relay email, validasi kriptografis token, serta isolasi penuh antar user.'
+      'Dukungan Google dan Apple Sign-In dengan enkripsi sesi token serta perlindungan privasi data pengguna.'
   },
 
   comparison: {

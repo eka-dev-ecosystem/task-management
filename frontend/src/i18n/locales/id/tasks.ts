@@ -42,7 +42,7 @@ export const taskModal = {
   createTitle: 'Buat Tugas Baru',
   createSubtitle: 'Tambahkan tugas prioritas, rincian langkah, atau tentukan tenggat waktu.',
   titleLabel: 'Judul Tugas',
-  titlePlaceholder: 'mis. Implementasikan transaksi PostgreSQL',
+  titlePlaceholder: 'mis. Siapkan materi presentasi proyek kuartal',
   descriptionLabel: 'Deskripsi Lengkap',
   descriptionPlaceholder: 'Jelaskan kriteria penyelesaian, konteks, atau skenario khusus...',
   statusLabel: 'Status Awal',
@@ -202,7 +202,7 @@ export const recurring = {
   months: 'Bulan',
   form: {
     titleLabel: 'Judul Template *',
-    titlePlaceholder: 'mis. Standup Harian Tim Backend',
+    titlePlaceholder: 'mis. Standup Harian Tim',
     titleRequired: 'Judul template wajib diisi',
     descriptionLabel: 'Deskripsi',
     descriptionPlaceholder: 'Deskripsi atau catatan khusus untuk tugas berulang ini...',

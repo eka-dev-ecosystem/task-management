@@ -29,8 +29,8 @@
 "calendar.dismiss" = "Tutup";
 
 /* Auth */
-"auth.title" = "Task Manager Native";
-"auth.subtitle" = "Kelola tugas, ide, dan pengingat secara real-time tersinkronisasi dengan backend Go.";
+"auth.title" = "Task Hub";
+"auth.subtitle" = "Kelola tugas, proyek, catatan, dan pengingat dalam satu ruang kerja yang terpadu.";
 "auth.signin.apple" = "Masuk dengan Apple";
 "auth.signin.google" = "Masuk dengan Google";
 "auth.signout" = "Keluar (Sign Out)";

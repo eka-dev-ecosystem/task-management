@@ -748,13 +748,13 @@ export const LandingPage: React.FC = () => {
                 </span>
               </div>
               <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                Architecture Roadmap
+                Weekly Goals & Notes
               </div>
-              <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 space-y-1.5 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">
-                <p className="text-indigo-400 font-semibold">## AI Tools</p>
-                <p>- [x] TaskHub MCP stdio</p>
-                <p>- [x] Redis PubSub bridge</p>
-                <p>- [ ] Automated changelog</p>
+              <div className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1.5 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">
+                <p className="text-indigo-500 font-semibold">Sprint Deliverables</p>
+                <p>- [x] Finalize design mockups</p>
+                <p>- [x] Review task checklist</p>
+                <p>- [ ] Schedule team briefing</p>
               </div>
               <button
                 onClick={handleDemoLogin}
@@ -769,12 +769,12 @@ export const LandingPage: React.FC = () => {
           {/* Floating Live Badge Overlays */}
           <div className="hidden sm:flex absolute bottom-5 left-8 px-3 py-2 rounded-xl bg-slate-900/90 dark:bg-slate-800/90 border border-slate-700 text-white text-xs font-medium items-center gap-2 shadow-xl backdrop-blur-md">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>🤖 MCP Server: Connected to Cursor Agent</span>
+            <span>Productivity Sync: Live & Up to Date</span>
           </div>
 
           <div className="hidden sm:flex absolute bottom-5 right-8 px-3 py-2 rounded-xl bg-slate-900/90 dark:bg-slate-800/90 border border-slate-700 text-white text-xs font-medium items-center gap-2 shadow-xl backdrop-blur-md">
             <i className="pi pi-bolt text-amber-400 text-xs" />
-            <span>Sub-10ms Local-First Response</span>
+            <span>Instant & Smooth Experience</span>
           </div>
         </div>
       </section>

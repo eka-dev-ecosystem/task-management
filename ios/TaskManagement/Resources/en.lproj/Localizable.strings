@@ -29,8 +29,8 @@
 "calendar.dismiss" = "Dismiss";
 
 /* Auth */
-"auth.title" = "Task Manager Native";
-"auth.subtitle" = "Manage tasks, ideas, and reminders in real-time synced with Go backend.";
+"auth.title" = "Task Hub";
+"auth.subtitle" = "Organize tasks, projects, notes, and reminders in one unified workspace.";
 "auth.signin.apple" = "Sign in with Apple";
 "auth.signin.google" = "Sign in with Google";
 "auth.signout" = "Sign Out";
