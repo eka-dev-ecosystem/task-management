@@ -576,6 +576,7 @@ public enum L10n {
         public static var notFound: String { "errors.NOT_FOUND".localized }
         public static var validationError: String { "errors.VALIDATION_ERROR".localized }
         public static var networkError: String { "errors.NETWORK_ERROR".localized }
+        public static var timeout: String { "errors.TIMEOUT".localized }
         public static var internalServerError: String { "errors.INTERNAL_SERVER_ERROR".localized }
 
         /// Resolves an error (APIError, URLError, Cancellation, or general Error) into a user-friendly, localized string.
@@ -594,6 +595,9 @@ public enum L10n {
             if nsErr.domain == NSURLErrorDomain {
                 if nsErr.code == NSURLErrorCancelled {
                     return ""
+                }
+                if nsErr.code == NSURLErrorTimedOut {
+                    return "errors.TIMEOUT".localized
                 }
                 if nsErr.code == NSURLErrorNotConnectedToInternet || nsErr.code == NSURLErrorNetworkConnectionLost {
                     return "errors.NETWORK_ERROR".localized

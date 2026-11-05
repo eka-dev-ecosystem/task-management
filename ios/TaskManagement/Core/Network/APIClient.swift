@@ -35,8 +35,13 @@ public enum APIError: LocalizedError, Sendable {
             return "INTERNAL_SERVER_ERROR"
         case .networkError(let err):
             let nsErr = err as NSError
-            if nsErr.domain == NSURLErrorDomain && (nsErr.code == NSURLErrorNotConnectedToInternet || nsErr.code == NSURLErrorNetworkConnectionLost) {
-                return "NETWORK_ERROR"
+            if nsErr.domain == NSURLErrorDomain {
+                if nsErr.code == NSURLErrorTimedOut {
+                    return "TIMEOUT"
+                }
+                if nsErr.code == NSURLErrorNotConnectedToInternet || nsErr.code == NSURLErrorNetworkConnectionLost {
+                    return "NETWORK_ERROR"
+                }
             }
             return "NETWORK_ERROR"
         case .cancelled:
@@ -50,7 +55,12 @@ public enum APIError: LocalizedError, Sendable {
         case .unauthorized(_, let msg): return msg ?? "Session expired. Please sign in again."
         case .serverError(let msg, _, _): return msg
         case .decodingError(let err): return "Failed to parse data: \(err.localizedDescription)"
-        case .networkError(let err): return err.localizedDescription
+        case .networkError(let err):
+            let nsErr = err as NSError
+            if nsErr.domain == NSURLErrorDomain && nsErr.code == NSURLErrorTimedOut {
+                return L10n.Errors.timeout
+            }
+            return err.localizedDescription
         case .cancelled: return ""
         }
     }
@@ -101,7 +111,9 @@ public actor APIClient {
 
     private init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForRequest = 45
+        config.timeoutIntervalForResource = 60
+        config.waitsForConnectivity = true
         self.session = URLSession(configuration: config)
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
@@ -164,6 +176,7 @@ public actor APIClient {
         method: String = "GET",
         body: Data? = nil,
         retryOn401: Bool = true,
+        retryOnNetworkError: Bool = true,
         customHeaders: [String: String]? = nil
     ) async throws -> T {
         guard let url = URL(string: "\(baseURL)/\(endpoint)") else {
@@ -207,6 +220,30 @@ public actor APIClient {
                 AppLogger.debug("Request cancelled for endpoint '\(endpoint)'", category: .network)
                 throw APIError.cancelled
             }
+
+            let isTimeoutOrConnectionLost: Bool = {
+                if let urlErr = error as? URLError {
+                    return urlErr.code == .timedOut || urlErr.code == .networkConnectionLost
+                }
+                let nsErr = error as NSError
+                return nsErr.domain == NSURLErrorDomain &&
+                    (nsErr.code == NSURLErrorTimedOut || nsErr.code == NSURLErrorNetworkConnectionLost)
+            }()
+
+            // Auto-retry idempotent requests (e.g. GET/HEAD) once on transient timeout/connection lost (e.g. KEDA scale-to-zero cold start)
+            if retryOnNetworkError && (method == "GET" || method == "HEAD") && isTimeoutOrConnectionLost {
+                AppLogger.warn("Network timeout or connection lost on \(method) '\(endpoint)'. Retrying once after delay...", category: .network)
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                return try await request(
+                    endpoint: endpoint,
+                    method: method,
+                    body: body,
+                    retryOn401: retryOn401,
+                    retryOnNetworkError: false,
+                    customHeaders: customHeaders
+                )
+            }
+
             let durationMs = Int64((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
             CrashReporterService.shared.recordHttpError(
                 method: method,
@@ -242,7 +279,14 @@ public actor APIClient {
                 let refreshed = await refreshToken()
                 if refreshed {
                     AppLogger.success("Token refreshed successfully. Retrying request to '\(endpoint)'...", category: .auth)
-                    return try await request(endpoint: endpoint, method: method, body: body, retryOn401: false, customHeaders: customHeaders)
+                    return try await request(
+                        endpoint: endpoint,
+                        method: method,
+                        body: body,
+                        retryOn401: false,
+                        retryOnNetworkError: retryOnNetworkError,
+                        customHeaders: customHeaders
+                    )
                 }
             }
 

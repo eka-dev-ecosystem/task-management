@@ -37,7 +37,40 @@ public struct NetworkLogger: Sendable {
     }
 
     public static func logError(url: String, method: String, error: Error) {
-        AppLogger.error("Network request failed: \(method) \(url)", error: error, category: .network)
+        if error.isTaskOrURLCancelled {
+            AppLogger.debug("Network request cancelled: \(method) \(url)", category: .network)
+            return
+        }
+
+        let isTransient: Bool = {
+            if let urlErr = error as? URLError {
+                switch urlErr.code {
+                case .timedOut, .notConnectedToInternet, .networkConnectionLost,
+                     .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
+                    return true
+                default:
+                    return false
+                }
+            }
+            let nsErr = error as NSError
+            if nsErr.domain == NSURLErrorDomain {
+                switch nsErr.code {
+                case NSURLErrorTimedOut, NSURLErrorNotConnectedToInternet,
+                     NSURLErrorNetworkConnectionLost, NSURLErrorCannotFindHost,
+                     NSURLErrorCannotConnectToHost, NSURLErrorDNSLookupFailed:
+                    return true
+                default:
+                    return false
+                }
+            }
+            return false
+        }()
+
+        if isTransient {
+            AppLogger.warn("Network request issue (\(error.localizedDescription)): \(method) \(url)", category: .network)
+        } else {
+            AppLogger.error("Network request failed: \(method) \(url)", error: error, category: .network)
+        }
     }
 
     public static func logSSE(event: String, data: String) {

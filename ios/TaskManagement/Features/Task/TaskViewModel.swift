@@ -624,8 +624,12 @@ public final class TaskViewModel {
                 metadata: ["count": recurringTasks.count]
             )
         } catch {
-            AppLogger.error("Failed to load recurring tasks", error: error, category: .task)
-            self.errorMessage = error.localizedDescription
+            if error.isTaskOrURLCancelled {
+                AppLogger.debug("Load recurring tasks cancelled", category: .task)
+            } else {
+                AppLogger.warn("Failed to load recurring tasks", error: error, category: .task)
+                self.errorMessage = L10n.Errors.message(for: error)
+            }
         }
         isLoadingRecurring = false
     }
@@ -639,8 +643,9 @@ public final class TaskViewModel {
             }
             AppLogger.success("Toggled recurring task active state", category: .task, metadata: ["id": id, "isActive": updated.isActive])
         } catch {
+            if error.isTaskOrURLCancelled { return }
             AppLogger.error("Failed to toggle recurring task", error: error, category: .task)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
         }
     }
 
@@ -652,8 +657,9 @@ public final class TaskViewModel {
             AppLogger.success("Deleted recurring task template", category: .task, metadata: ["id": id])
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to delete recurring task", error: error, category: .task)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -667,8 +673,9 @@ public final class TaskViewModel {
             await loadTasks()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to create recurring task", error: error, category: .task)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -683,8 +690,9 @@ public final class TaskViewModel {
             AppLogger.success("Updated recurring task template", category: .task, metadata: ["id": id])
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to update recurring task", error: error, category: .task)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }

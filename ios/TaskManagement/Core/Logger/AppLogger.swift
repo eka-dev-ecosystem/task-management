@@ -126,12 +126,13 @@ public final class AppLogger: Sendable {
 
     public static func warn(
         _ message: String,
+        error: Error? = nil,
         category: LogCategory = .app,
         metadata: [String: Any]? = nil,
         file: String = #file,
         line: Int = #line
     ) {
-        log(level: .warning, message: message, category: category, error: nil, metadata: metadata, file: file, line: line)
+        log(level: .warning, message: message, category: category, error: error, metadata: metadata, file: file, line: line)
     }
 
     public static func error(
@@ -186,20 +187,24 @@ public final class AppLogger: Sendable {
 
         // Forward warning and error events to Grafana Loki via CrashReporterService
         if level >= .warning {
-            if let error = error {
+            if level == .error, let error = error {
                 CrashReporterService.shared.recordError(
                     error,
                     reason: message,
-                    fatal: level == .error,
+                    fatal: false,
                     tag: category.rawValue,
                     customData: metadata
                 )
             } else {
+                var extra = metadata ?? [:]
+                if let error = error {
+                    extra["error"] = error.localizedDescription
+                }
                 CrashReporterService.shared.recordLog(
                     message: "\(message)\(metaString)",
                     level: level.title,
                     tag: category.rawValue,
-                    extra: metadata
+                    extra: extra.isEmpty ? nil : extra
                 )
             }
         }
