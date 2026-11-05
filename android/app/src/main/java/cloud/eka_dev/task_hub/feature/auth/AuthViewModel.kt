@@ -1,12 +1,16 @@
 package cloud.eka_dev.task_hub.feature.auth
 
 import android.content.Context
+import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import cloud.eka_dev.task_hub.R
 import cloud.eka_dev.task_hub.core.datastore.TokenManager
 import cloud.eka_dev.task_hub.core.model.OAuthLoginRequest
 import cloud.eka_dev.task_hub.core.network.ApiClient
@@ -19,7 +23,11 @@ sealed class AuthState {
     object Idle : AuthState()
     object Loading : AuthState()
     data class Authenticated(val userName: String) : AuthState()
-    data class Error(val message: String) : AuthState()
+    data class Error(
+        val message: String? = null,
+        val messageRes: Int? = null,
+        val formatArgs: List<Any> = emptyList()
+    ) : AuthState()
 }
 
 class AuthViewModel(
@@ -38,7 +46,8 @@ class AuthViewModel(
         viewModelScope.launch {
             val token = tokenManager.getAccessToken()
             if (!token.isNullOrEmpty()) {
-                _state.value = AuthState.Authenticated("User")
+                val userName = tokenManager.getUserName().orEmpty()
+                _state.value = AuthState.Authenticated(userName)
             }
         }
     }
@@ -51,7 +60,7 @@ class AuthViewModel(
                 val googleIdOption = GetGoogleIdOption.Builder()
                     .setFilterByAuthorizedAccounts(false)
                     .setServerClientId(serverClientId)
-                    .setAutoSelectEnabled(true)
+                    .setAutoSelectEnabled(false)
                     .build()
 
                 val request = GetCredentialRequest.Builder()
@@ -81,38 +90,37 @@ class AuthViewModel(
                         tokenManager.saveUserInfo(user.id, user.name, user.email)
                         _state.value = AuthState.Authenticated(user.name)
                     } else {
-                        _state.value = AuthState.Error(response.message.ifEmpty { "Login failed" })
+                        val err = response.message.ifEmpty { null }
+                        if (err != null) {
+                            _state.value = AuthState.Error(message = err)
+                        } else {
+                            _state.value = AuthState.Error(messageRes = R.string.auth_error_login_failed)
+                        }
                     }
-                }
-            } catch (e: Exception) {
-                _state.value = AuthState.Error(e.localizedMessage ?: "Google sign in error")
-            }
-        }
-    }
-
-    fun signInWithAppleSimulated(idToken: String, email: String, name: String) {
-        viewModelScope.launch {
-            _state.value = AuthState.Loading
-            try {
-                val response = apiClient.apiService.oauthLogin(
-                    OAuthLoginRequest(
-                        provider = "apple",
-                        idToken = idToken,
-                        email = email,
-                        name = name
-                    )
-                )
-                if (response.success && response.data?.tokens != null) {
-                    val tokens = response.data.tokens
-                    val user = response.data.user
-                    tokenManager.saveTokens(tokens.accessToken, tokens.refreshToken)
-                    tokenManager.saveUserInfo(user.id, user.name, user.email)
-                    _state.value = AuthState.Authenticated(user.name)
                 } else {
-                    _state.value = AuthState.Error(response.message.ifEmpty { "Apple login failed" })
+                    _state.value = AuthState.Error(
+                        messageRes = R.string.auth_error_unsupported_credential,
+                        formatArgs = listOf(credential.type)
+                    )
                 }
+            } catch (e: GetCredentialCancellationException) {
+                // User intentionally cancelled or dismissed the Google account picker
+                Log.d("AuthViewModel", "Google sign-in was cancelled by user: ${e.message}")
+                _state.value = AuthState.Idle
+            } catch (e: GetCredentialException) {
+                Log.e("AuthViewModel", "Google credential error [${e.javaClass.simpleName}]: ${e.message}", e)
+                val detail = e.localizedMessage ?: e.message.orEmpty()
+                _state.value = AuthState.Error(
+                    messageRes = R.string.auth_error_google_failed,
+                    formatArgs = listOf(detail)
+                )
             } catch (e: Exception) {
-                _state.value = AuthState.Error(e.localizedMessage ?: "Apple login error")
+                Log.e("AuthViewModel", "Google sign-in unexpected error", e)
+                val detail = e.localizedMessage ?: e.message.orEmpty()
+                _state.value = AuthState.Error(
+                    messageRes = R.string.auth_error_google_failed,
+                    formatArgs = listOf(detail)
+                )
             }
         }
     }

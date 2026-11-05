@@ -73,7 +73,7 @@ android {
         // Dynamic Environment Config (matches iOS EnvReader behavior)
         val defaultBaseUrl = getEnv("API_BASE_URL", "BASE_URL", "VITE_API_URL", defaultVal = "https://be-task-hub.eka-dev.cloud/api/v1/")
         val defaultSseUrl = getEnv("SSE_URL", "VITE_WS_URL", defaultVal = "${defaultBaseUrl.trimEnd('/')}/realtime/sse/events")
-        val defaultGoogleClientId = getEnv("GOOGLE_CLIENT_ID", "GOOGLE_WEB_CLIENT_ID", "VITE_GOOGLE_CLIENT_ID", defaultVal = "897905079551-86q6g4ov6b966r2t7sbmqsmks5bea682.apps.googleusercontent.com")
+        val defaultGoogleClientId = getEnv("GOOGLE_CLIENT_ID", "GOOGLE_WEB_CLIENT_ID", "VITE_GOOGLE_CLIENT_ID", defaultVal = "897905079551-sbg34ier1pj7926blbbv7lagmn98feel.apps.googleusercontent.com")
         val defaultLokiUrl = getEnv("LOKI_URL", defaultVal = "https://loki.eka-dev.cloud/loki/api/v1/push")
 
         buildConfigField("String", "BASE_URL", "\"$defaultBaseUrl\"")
@@ -106,6 +106,11 @@ android {
             val debugSseUrl = getEnv("DEV_SSE_URL", "SSE_URL", defaultVal = "${debugBaseUrl.trimEnd('/')}/realtime/sse/events")
             buildConfigField("String", "BASE_URL", "\"$debugBaseUrl\"")
             buildConfigField("String", "SSE_URL", "\"$debugSseUrl\"")
+
+            val releaseSigning = signingConfigs.getByName("release")
+            if (releaseSigning.storeFile?.exists() == true) {
+                signingConfig = releaseSigning
+            }
         }
         release {
             isMinifyEnabled = false
@@ -120,7 +125,7 @@ android {
 
             val prodBaseUrl = getEnv("PROD_BASE_URL", "API_BASE_URL", "BASE_URL", defaultVal = "https://be-task-hub.eka-dev.cloud/api/v1/")
             val prodSseUrl = getEnv("PROD_SSE_URL", "SSE_URL", defaultVal = "${prodBaseUrl.trimEnd('/')}/realtime/sse/events")
-            val prodGoogleClientId = getEnv("PROD_GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID", "GOOGLE_WEB_CLIENT_ID", defaultVal = "897905079551-86q6g4ov6b966r2t7sbmqsmks5bea682.apps.googleusercontent.com")
+            val prodGoogleClientId = getEnv("PROD_GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID", "GOOGLE_WEB_CLIENT_ID", defaultVal = "897905079551-sbg34ier1pj7926blbbv7lagmn98feel.apps.googleusercontent.com")
 
             buildConfigField("String", "BASE_URL", "\"$prodBaseUrl\"")
             buildConfigField("String", "SSE_URL", "\"$prodSseUrl\"")

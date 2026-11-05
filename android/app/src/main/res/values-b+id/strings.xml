@@ -11,17 +11,23 @@
     <string name="nav_mcp">Token MCP</string>
 
     <!-- Auth -->
-    <string name="auth_title">Task Hub Native</string>
-    <string name="auth_subtitle">Kelola tugas, ide, dan pengingat secara real-time tersinkronisasi dengan backend Go.</string>
+    <string name="auth_title">Task Hub</string>
+    <string name="auth_subtitle">Kelola tugas, proyek, catatan, dan pengingat dalam satu ruang kerja yang rapi dan terpadu.</string>
+    <string name="auth_tagline">Ruang kerja produktivitas cerdas untuk rencana harian Anda.</string>
+    <string name="auth_default_user">Pengguna</string>
+    <string name="auth_error_google_failed">Gagal masuk dengan Google: %1$s</string>
+    <string name="auth_error_unsupported_credential">Tipe kredensial tidak didukung: %1$s</string>
+    <string name="auth_error_login_failed">Gagal masuk. Periksa koneksi internet Anda atau coba lagi.</string>
+    <string name="auth_error_cancelled">Proses masuk dibatalkan.</string>
+    <string name="auth_error_unknown">Terjadi kesalahan autentikasi yang tidak terduga.</string>
     <string name="sign_in_google">Masuk dengan Google</string>
-    <string name="sign_in_apple">Masuk dengan Apple</string>
     <string name="sign_out">Keluar (Sign Out)</string>
-    <string name="feature_realtime_title">Sinkronisasi Real-time</string>
-    <string name="feature_realtime_desc">Streaming SSE instan ke server backend Go</string>
-    <string name="feature_projects_title">Manajemen Proyek</string>
-    <string name="feature_projects_desc">Kelola modul &amp; checklist tugas terpadu</string>
-    <string name="feature_reminders_title">Pengingat Pintar</string>
-    <string name="feature_reminders_desc">Notifikasi alert push otomatis</string>
+    <string name="feature_realtime_title">Pengelolaan Tugas Cerdas</string>
+    <string name="feature_realtime_desc">Atur prioritas tugas harian dan pantau progres kerja dengan mudah</string>
+    <string name="feature_projects_title">Proyek &amp; Target Kerja</string>
+    <string name="feature_projects_desc">Kelompokkan pekerjaan dan capai target tepat waktu</string>
+    <string name="feature_reminders_title">Pengingat Tepat Waktu</string>
+    <string name="feature_reminders_desc">Jadwalkan alarm agar tidak melewatkan tenggat waktu penting</string>
 
     <!-- Common Actions -->
     <string name="save">Simpan</string>

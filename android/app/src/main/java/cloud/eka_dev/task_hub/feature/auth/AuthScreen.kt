@@ -1,5 +1,8 @@
 package cloud.eka_dev.task_hub.feature.auth
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -68,7 +71,7 @@ fun AuthScreen(
             )
 
             Text(
-                text = "Produktivitas cerdas tersinkronisasi real-time.",
+                text = stringResource(R.string.auth_tagline),
                 fontSize = 15.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -89,7 +92,7 @@ fun AuthScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     FeatureHighlightRow(
-                        icon = Icons.Default.Bolt,
+                        icon = Icons.Default.CheckCircle,
                         title = stringResource(R.string.feature_realtime_title),
                         desc = stringResource(R.string.feature_realtime_desc),
                         color = BrandPrimary
@@ -112,13 +115,22 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(28.dp))
 
             if (state is AuthState.Error) {
+                val errorState = state as AuthState.Error
+                val errorMessage = when {
+                    errorState.messageRes != null -> stringResource(
+                        errorState.messageRes,
+                        *errorState.formatArgs.toTypedArray()
+                    )
+                    !errorState.message.isNullOrEmpty() -> errorState.message
+                    else -> stringResource(R.string.auth_error_unknown)
+                }
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                 ) {
                     Text(
-                        text = (state as AuthState.Error).message,
+                        text = errorMessage,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.padding(14.dp),
                         fontSize = 13.sp
@@ -130,50 +142,12 @@ fun AuthScreen(
             AppButton(
                 text = stringResource(R.string.sign_in_google),
                 onClick = {
-                    viewModel.signInWithGoogle(context, BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                    val activityContext = context.findActivity() ?: context
+                    viewModel.signInWithGoogle(activityContext, BuildConfig.GOOGLE_WEB_CLIENT_ID)
                 },
                 isLoading = state is AuthState.Loading,
                 modifier = Modifier.fillMaxWidth()
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Apple Sign-In
-            Button(
-                onClick = {
-                    viewModel.signInWithAppleSimulated("mock_apple_token", "user@apple.com", "Apple User")
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
-            ) {
-                Text(
-                    text = stringResource(R.string.sign_in_apple),
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Backend Status
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(StatusDone)
-                )
-                Text(
-                    text = "Connected to be-task-hub.eka-dev.cloud",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 }
@@ -203,4 +177,13 @@ fun FeatureHighlightRow(
             Text(desc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+private fun Context.findActivity(): Activity? {
+    var currentContext = this
+    while (currentContext is ContextWrapper) {
+        if (currentContext is Activity) return currentContext
+        currentContext = currentContext.baseContext
+    }
+    return null
 }

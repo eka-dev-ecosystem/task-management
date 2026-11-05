@@ -28,7 +28,7 @@ SSE_URL=https://be-task-hub.eka-dev.cloud/api/v1/realtime/sse/events
 ## -------------------------------------------------------------------------
 ## Google Sign-In (Credential Manager)
 ## -------------------------------------------------------------------------
-GOOGLE_WEB_CLIENT_ID=897905079551-86q6g4ov6b966r2t7sbmqsmks5bea682.apps.googleusercontent.com
+GOOGLE_WEB_CLIENT_ID=897905079551-sbg34ier1pj7926blbbv7lagmn98feel.apps.googleusercontent.com
 
 ## -------------------------------------------------------------------------
 ## Release Keystore & App Signing

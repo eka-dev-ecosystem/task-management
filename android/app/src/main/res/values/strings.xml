@@ -11,17 +11,23 @@
     <string name="nav_mcp">MCP Tokens</string>
 
     <!-- Auth -->
-    <string name="auth_title">Task Hub Native</string>
-    <string name="auth_subtitle">Manage tasks, ideas, and reminders in real-time synced with Go backend.</string>
+    <string name="auth_title">Task Hub</string>
+    <string name="auth_subtitle">Organize tasks, projects, notes, and reminders in one clean, unified workspace.</string>
+    <string name="auth_tagline">Smart productivity workspace for your daily goals.</string>
+    <string name="auth_default_user">User</string>
+    <string name="auth_error_google_failed">Google sign-in failed: %1$s</string>
+    <string name="auth_error_unsupported_credential">Unsupported credential type: %1$s</string>
+    <string name="auth_error_login_failed">Login failed. Please check your network or try again.</string>
+    <string name="auth_error_cancelled">Sign-in was cancelled.</string>
+    <string name="auth_error_unknown">An unexpected authentication error occurred.</string>
     <string name="sign_in_google">Sign in with Google</string>
-    <string name="sign_in_apple">Sign in with Apple</string>
     <string name="sign_out">Sign Out</string>
-    <string name="feature_realtime_title">Real-time Live Sync</string>
-    <string name="feature_realtime_desc">Instant SSE streaming to Go backend</string>
-    <string name="feature_projects_title">Project Management</string>
-    <string name="feature_projects_desc">Manage modules &amp; task checklists</string>
-    <string name="feature_reminders_title">Smart Reminders</string>
-    <string name="feature_reminders_desc">Automatic push notification alerts</string>
+    <string name="feature_realtime_title">Smart Task Tracking</string>
+    <string name="feature_realtime_desc">Break down daily tasks and track progress effortlessly</string>
+    <string name="feature_projects_title">Projects &amp; Milestones</string>
+    <string name="feature_projects_desc">Organize work into projects and reach your goals on time</string>
+    <string name="feature_reminders_title">Timely Reminders</string>
+    <string name="feature_reminders_desc">Stay on schedule and never miss an important deadline</string>
 
     <!-- Common Actions -->
     <string name="save">Save</string>
