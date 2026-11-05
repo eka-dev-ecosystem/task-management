@@ -381,10 +381,12 @@ public final class CalendarViewModel {
                     "activities": acts.count,
                 ])
         } catch {
-            guard !Task.isCancelled else { return }
-            AppLogger.error(
-                "Failed to load Calendar GraphQL data", error: error, category: .network)
-            self.errorMessage = error.localizedDescription
+            if error.isTaskOrURLCancelled {
+                AppLogger.debug("Calendar GraphQL data load cancelled", category: .network)
+            } else {
+                AppLogger.warn("Failed to load Calendar GraphQL data", error: error, category: .network)
+                self.errorMessage = L10n.Errors.message(for: error)
+            }
         }
 
         if !Task.isCancelled {
@@ -398,7 +400,9 @@ public final class CalendarViewModel {
             _ = try await apiClient.snoozeReminder(id: id, minutes: minutes)
             await loadData()
         } catch {
-            self.errorMessage = error.localizedDescription
+            if error.isTaskOrURLCancelled { return }
+            AppLogger.error("Failed to snooze reminder", error: error, category: .reminder)
+            self.errorMessage = L10n.Errors.message(for: error)
         }
     }
 
@@ -408,7 +412,9 @@ public final class CalendarViewModel {
             _ = try await apiClient.dismissReminder(id: id)
             await loadData()
         } catch {
-            self.errorMessage = error.localizedDescription
+            if error.isTaskOrURLCancelled { return }
+            AppLogger.error("Failed to dismiss reminder", error: error, category: .reminder)
+            self.errorMessage = L10n.Errors.message(for: error)
         }
     }
 }

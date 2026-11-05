@@ -22,8 +22,12 @@ public final class NoteViewModel {
             self.notes = try await apiClient.getNotes()
             AppLogger.info("Notes loaded successfully", category: .app, metadata: ["count": notes.count])
         } catch {
-            AppLogger.error("Failed to load notes", error: error, category: .app)
-            self.errorMessage = error.localizedDescription
+            if error.isTaskOrURLCancelled {
+                AppLogger.debug("Notes load cancelled", category: .app)
+            } else {
+                AppLogger.warn("Failed to load notes", error: error, category: .app)
+                self.errorMessage = L10n.Errors.message(for: error)
+            }
         }
         self.isLoading = false
     }
@@ -58,8 +62,9 @@ public final class NoteViewModel {
             await loadNotes()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to create note", error: error, category: .app)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -75,8 +80,9 @@ public final class NoteViewModel {
             await loadNotes()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to update note", error: error, category: .app)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -92,8 +98,9 @@ public final class NoteViewModel {
                 AppLogger.success("Note pin toggled", category: .app, metadata: ["id": note.id])
                 await loadNotes()
             } catch {
+                if error.isTaskOrURLCancelled { return }
                 AppLogger.error("Failed to toggle note pin", error: error, category: .app)
-                self.errorMessage = error.localizedDescription
+                self.errorMessage = L10n.Errors.message(for: error)
             }
         }
     }
@@ -106,8 +113,9 @@ public final class NoteViewModel {
                 AppLogger.success("Note deleted successfully", category: .app, metadata: ["id": id])
                 await loadNotes()
             } catch {
+                if error.isTaskOrURLCancelled { return }
                 AppLogger.error("Failed to delete note", error: error, category: .app)
-                self.errorMessage = error.localizedDescription
+                self.errorMessage = L10n.Errors.message(for: error)
             }
         }
     }
@@ -121,8 +129,9 @@ public final class NoteViewModel {
             await loadNotes()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to convert note to task", error: error, category: .app)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }

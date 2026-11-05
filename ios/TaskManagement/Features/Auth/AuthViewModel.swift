@@ -95,8 +95,12 @@ public final class AuthViewModel {
                         AppLogger.success("Apple Sign-In completed successfully", category: .auth)
                         await PushNotificationManager.shared.registerDeviceTokenWithBackend()
                     } catch {
-                        AppLogger.error("Apple Sign-In backend verification failed", error: error, category: .auth)
-                        self.errorMessage = error.localizedDescription
+                        if error.isTaskOrURLCancelled {
+                            AppLogger.debug("Apple Sign-In backend exchange cancelled", category: .auth)
+                        } else {
+                            AppLogger.error("Apple Sign-In backend verification failed", error: error, category: .auth)
+                            self.errorMessage = L10n.Errors.message(for: error)
+                        }
                     }
                     self.isAppleLoading = false
                     self.isLoading = false
@@ -111,7 +115,7 @@ public final class AuthViewModel {
             let authError = error as? ASAuthorizationError
             if authError?.code != .canceled {
                 AppLogger.warn("Apple Sign-In authorization flow cancelled or failed", category: .auth, metadata: ["error": error.localizedDescription])
-                errorMessage = error.localizedDescription
+                errorMessage = L10n.Errors.message(for: error)
             } else {
                 AppLogger.info("User cancelled Apple Sign-In sheet", category: .auth)
             }
@@ -142,7 +146,7 @@ public final class AuthViewModel {
                     // GIDSignInErrorCodeCanceled = -5
                     if nsError.code != -5 {
                         AppLogger.error("Google Sign-In presented error", error: error, category: .auth)
-                        self.errorMessage = error.localizedDescription
+                        self.errorMessage = L10n.Errors.message(for: error)
                     } else {
                         AppLogger.info("User cancelled Google Sign-In dialog", category: .auth)
                     }
@@ -180,8 +184,12 @@ public final class AuthViewModel {
                     AppLogger.success("Google Sign-In completed successfully", category: .auth)
                     await PushNotificationManager.shared.registerDeviceTokenWithBackend()
                 } catch {
-                    AppLogger.error("Google Sign-In backend verification failed", error: error, category: .auth)
-                    self.errorMessage = error.localizedDescription
+                    if error.isTaskOrURLCancelled {
+                        AppLogger.debug("Google Sign-In backend exchange cancelled", category: .auth)
+                    } else {
+                        AppLogger.error("Google Sign-In backend verification failed", error: error, category: .auth)
+                        self.errorMessage = L10n.Errors.message(for: error)
+                    }
                 }
                 self.isGoogleLoading = false
                 self.isLoading = false

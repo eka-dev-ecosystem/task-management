@@ -726,7 +726,8 @@ public actor APIClient {
     public func graphql<T: Codable>(
         query: String,
         variables: [String: Any]? = nil,
-        retryOn401: Bool = true
+        retryOn401: Bool = true,
+        retryOnNetworkError: Bool = true
     ) async throws -> T {
         guard let url = URL(string: "\(baseURL)/graphql") else {
             throw APIError.invalidURL
@@ -759,6 +760,28 @@ public actor APIClient {
                 AppLogger.debug("GraphQL query cancelled", category: .network)
                 throw APIError.cancelled
             }
+
+            let isTimeoutOrConnectionLost: Bool = {
+                if let urlErr = error as? URLError {
+                    return urlErr.code == .timedOut || urlErr.code == .networkConnectionLost
+                }
+                let nsErr = error as NSError
+                return nsErr.domain == NSURLErrorDomain &&
+                    (nsErr.code == NSURLErrorTimedOut || nsErr.code == NSURLErrorNetworkConnectionLost)
+            }()
+
+            // Auto-retry GraphQL query once on cold-start timeout/connection lost
+            if retryOnNetworkError && isTimeoutOrConnectionLost {
+                AppLogger.warn("Network timeout on GraphQL query. Retrying once (cold-start recovery)...", category: .network)
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                return try await graphql(
+                    query: query,
+                    variables: variables,
+                    retryOn401: retryOn401,
+                    retryOnNetworkError: false
+                )
+            }
+
             NetworkLogger.logError(url: url.absoluteString, method: "POST", error: error)
             throw APIError.networkError(error)
         }
@@ -780,7 +803,12 @@ public actor APIClient {
             if retryOn401 {
                 let refreshed = await refreshToken()
                 if refreshed {
-                    return try await graphql(query: query, variables: variables, retryOn401: false)
+                    return try await graphql(
+                        query: query,
+                        variables: variables,
+                        retryOn401: false,
+                        retryOnNetworkError: retryOnNetworkError
+                    )
                 }
             }
             throw APIError.unauthorized()

@@ -133,8 +133,12 @@ public final class ActiveAlarmManager {
             await SharedWidgetDataManager.shared.syncWithBackend()
             self.activeReminder = nil
         } catch {
+            if error.isTaskOrURLCancelled {
+                self.isProcessingAction = false
+                return
+            }
             AppLogger.error("Failed to snooze reminder", error: error, category: .reminder)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             // Re-trigger alarm sound if failed to snooze
             soundManager.startAlarm()
         }
@@ -153,8 +157,12 @@ public final class ActiveAlarmManager {
             await SharedWidgetDataManager.shared.syncWithBackend()
             self.activeReminder = nil
         } catch {
+            if error.isTaskOrURLCancelled {
+                self.isProcessingAction = false
+                return
+            }
             AppLogger.error("Failed to dismiss reminder", error: error, category: .reminder)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             // Re-trigger alarm sound if failed to dismiss
             soundManager.startAlarm()
         }

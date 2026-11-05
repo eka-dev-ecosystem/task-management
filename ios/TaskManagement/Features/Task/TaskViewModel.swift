@@ -138,7 +138,11 @@ public final class TaskViewModel {
             )
             SharedWidgetDataManager.shared.syncWithTaskList(self.tasks)
         } catch {
-            AppLogger.error("Failed to load more tasks", error: error, category: .task)
+            if error.isTaskOrURLCancelled {
+                AppLogger.debug("Load more tasks cancelled", category: .task)
+            } else {
+                AppLogger.warn("Failed to load more tasks", error: error, category: .task)
+            }
         }
         isLoadingMore = false
     }
@@ -167,7 +171,8 @@ public final class TaskViewModel {
             let task = try await apiClient.getTask(id: id)
             self.selectedTaskForDetail = task
         } catch {
-            AppLogger.error(
+            if error.isTaskOrURLCancelled { return }
+            AppLogger.warn(
                 "Failed to fetch task by id for deep link",
                 error: error,
                 category: .task,
@@ -184,9 +189,12 @@ public final class TaskViewModel {
                 "Projects loaded for tasks filter", category: .task,
                 metadata: ["count": projects.count])
         } catch {
+            if error.isTaskOrURLCancelled { return }
             AppLogger.warn(
-                "Failed to load projects for task association", category: .task,
-                metadata: ["error": error.localizedDescription])
+                "Failed to load projects for task association",
+                error: error,
+                category: .task
+            )
         }
     }
 
@@ -303,7 +311,9 @@ public final class TaskViewModel {
                     tasks[idx] = updated
                 }
             } catch {
-                self.errorMessage = error.localizedDescription
+                if error.isTaskOrURLCancelled { return }
+                AppLogger.error("Failed to toggle task focus", error: error, category: .task)
+                self.errorMessage = L10n.Errors.message(for: error)
             }
         }
     }
@@ -325,7 +335,9 @@ public final class TaskViewModel {
                 )
                 await loadTasks()
             } catch {
-                self.errorMessage = error.localizedDescription
+                if error.isTaskOrURLCancelled { return }
+                AppLogger.error("Failed to toggle task status", error: error, category: .task)
+                self.errorMessage = L10n.Errors.message(for: error)
             }
         }
     }
@@ -346,7 +358,9 @@ public final class TaskViewModel {
                 )
                 await loadTasks()
             } catch {
-                self.errorMessage = error.localizedDescription
+                if error.isTaskOrURLCancelled { return }
+                AppLogger.error("Failed to update task status", error: error, category: .task)
+                self.errorMessage = L10n.Errors.message(for: error)
             }
         }
     }
@@ -399,8 +413,9 @@ public final class TaskViewModel {
             await loadTasks()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to update task", error: error, category: .task)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -444,8 +459,9 @@ public final class TaskViewModel {
             await loadTasks()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to create task", error: error, category: .task)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -508,8 +524,9 @@ public final class TaskViewModel {
                     metadata: ["taskId": taskId, "subtaskId": subtaskId])
                 await loadTasks()
             } catch {
+                if error.isTaskOrURLCancelled { return }
                 AppLogger.error("Failed to toggle subtask", error: error, category: .task)
-                self.errorMessage = error.localizedDescription
+                self.errorMessage = L10n.Errors.message(for: error)
             }
         }
     }
@@ -524,8 +541,9 @@ public final class TaskViewModel {
             await loadTasks()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to create subtask", error: error, category: .task)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -556,8 +574,9 @@ public final class TaskViewModel {
             await loadTasks()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to update subtask", error: error, category: .task)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -570,8 +589,9 @@ public final class TaskViewModel {
             await loadTasks()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to delete subtask", error: error, category: .task)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -585,10 +605,16 @@ public final class TaskViewModel {
                 "Task activities loaded", category: .task,
                 metadata: ["taskId": taskId, "count": taskActivities.count])
         } catch {
-            AppLogger.error(
-                "Failed to load task activities", error: error, category: .task,
-                metadata: ["taskId": taskId])
-            self.errorMessage = error.localizedDescription
+            if error.isTaskOrURLCancelled {
+                AppLogger.debug("Task activities load cancelled", category: .task)
+            } else {
+                AppLogger.warn(
+                    "Failed to load task activities",
+                    error: error,
+                    category: .task,
+                    metadata: ["taskId": taskId])
+                self.errorMessage = L10n.Errors.message(for: error)
+            }
         }
         isLoadingActivities = false
     }
@@ -606,10 +632,11 @@ public final class TaskViewModel {
                 "Task activity note appended", category: .task, metadata: ["taskId": taskId])
             self.taskActivities.insert(newActivity, at: 0)
         } catch {
+            if error.isTaskOrURLCancelled { return }
             AppLogger.error(
                 "Failed to add task activity note", error: error, category: .task,
                 metadata: ["taskId": taskId])
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
         }
     }
 

@@ -30,8 +30,12 @@ public final class ReminderViewModel {
             AppLogger.info("Reminders loaded successfully", category: .reminder, metadata: ["count": reminders.count])
             syncAllLocalAlarms()
         } catch {
-            AppLogger.error("Failed to load reminders", error: error, category: .reminder)
-            self.errorMessage = error.localizedDescription
+            if error.isTaskOrURLCancelled {
+                AppLogger.debug("Reminders load cancelled", category: .reminder)
+            } else {
+                AppLogger.warn("Failed to load reminders", error: error, category: .reminder)
+                self.errorMessage = L10n.Errors.message(for: error)
+            }
         }
         self.isLoading = false
     }
@@ -84,8 +88,12 @@ public final class ReminderViewModel {
             isCreating = false
             return true
         } catch {
+            if error.isTaskOrURLCancelled {
+                isCreating = false
+                return false
+            }
             AppLogger.error("Failed to create reminder", error: error, category: .reminder)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             isCreating = false
             return false
         }
@@ -132,8 +140,12 @@ public final class ReminderViewModel {
             isUpdating = false
             return true
         } catch {
+            if error.isTaskOrURLCancelled {
+                isUpdating = false
+                return false
+            }
             AppLogger.error("Failed to update reminder", error: error, category: .reminder, metadata: ["id": id])
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             isUpdating = false
             return false
         }
@@ -161,8 +173,9 @@ public final class ReminderViewModel {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 #endif
             } catch {
+                if error.isTaskOrURLCancelled { return }
                 AppLogger.error("Failed to toggle alarm status", error: error, category: .reminder)
-                self.errorMessage = error.localizedDescription
+                self.errorMessage = L10n.Errors.message(for: error)
             }
         }
     }
@@ -176,8 +189,9 @@ public final class ReminderViewModel {
                 await loadReminders()
                 scheduleLocalAlarm(for: res)
             } catch {
+                if error.isTaskOrURLCancelled { return }
                 AppLogger.error("Failed to snooze reminder", error: error, category: .reminder, metadata: ["id": id])
-                self.errorMessage = error.localizedDescription
+                self.errorMessage = L10n.Errors.message(for: error)
             }
         }
     }
@@ -191,8 +205,9 @@ public final class ReminderViewModel {
                 await loadReminders()
                 scheduleLocalAlarm(for: res)
             } catch {
+                if error.isTaskOrURLCancelled { return }
                 AppLogger.error("Failed to dismiss reminder", error: error, category: .reminder, metadata: ["id": id])
-                self.errorMessage = error.localizedDescription
+                self.errorMessage = L10n.Errors.message(for: error)
             }
         }
     }
@@ -206,8 +221,9 @@ public final class ReminderViewModel {
                 UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["alarm_reminder_\(id)"])
                 await loadReminders()
             } catch {
+                if error.isTaskOrURLCancelled { return }
                 AppLogger.error("Failed to delete reminder", error: error, category: .reminder, metadata: ["id": id])
-                self.errorMessage = error.localizedDescription
+                self.errorMessage = L10n.Errors.message(for: error)
             }
         }
     }

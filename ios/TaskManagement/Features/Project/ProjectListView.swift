@@ -37,8 +37,12 @@ public final class ProjectViewModel {
             self.tasks = try await fetchedTasks
             AppLogger.info("Projects and tasks loaded", category: .app, metadata: ["projectsCount": projects.count, "tasksCount": tasks.count])
         } catch {
-            AppLogger.error("Failed to load projects data", error: error, category: .app)
-            self.errorMessage = error.localizedDescription
+            if error.isTaskOrURLCancelled {
+                AppLogger.debug("Projects data load cancelled", category: .app)
+            } else {
+                AppLogger.warn("Failed to load projects data", error: error, category: .app)
+                self.errorMessage = L10n.Errors.message(for: error)
+            }
         }
         self.isLoading = false
     }
@@ -103,8 +107,9 @@ public final class ProjectViewModel {
             await loadData()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to create project", error: error, category: .app)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -117,8 +122,9 @@ public final class ProjectViewModel {
             await loadData()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to update project", error: error, category: .app)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -132,8 +138,9 @@ public final class ProjectViewModel {
             await loadData()
             return true
         } catch {
+            if error.isTaskOrURLCancelled { return false }
             AppLogger.error("Failed to delete project", error: error, category: .app)
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
     }
@@ -148,7 +155,9 @@ public final class ProjectViewModel {
             )
             await loadData()
         } catch {
-            self.errorMessage = error.localizedDescription
+            if error.isTaskOrURLCancelled { return }
+            AppLogger.error("Failed to toggle project task status", error: error, category: .app)
+            self.errorMessage = L10n.Errors.message(for: error)
         }
     }
 }
