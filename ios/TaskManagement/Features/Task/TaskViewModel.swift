@@ -583,6 +583,13 @@ public final class TaskViewModel {
             }
         }
 
+        // Immediate local mutation for offline widget and instant response
+        SharedWidgetDataManager.shared.toggleSubtaskCancelledLocally(
+            taskId: taskId,
+            subtaskId: subtaskId,
+            isCancelled: newCancelled
+        )
+
         Task {
             do {
                 _ = try await apiClient.updateSubtask(

@@ -6,14 +6,45 @@ import WidgetKit
 public struct PendingSubtaskToggle: Codable, Sendable {
     public let taskId: Int64
     public let subtaskId: Int64
-    public let isCompleted: Bool
+    public let isCompleted: Bool?
+    public let isCancelled: Bool?
     public let timestamp: Date
+
+    public init(taskId: Int64, subtaskId: Int64, isCompleted: Bool? = nil, isCancelled: Bool? = nil, timestamp: Date = Date()) {
+        self.taskId = taskId
+        self.subtaskId = subtaskId
+        self.isCompleted = isCompleted
+        self.isCancelled = isCancelled
+        self.timestamp = timestamp
+    }
 
     public init(taskId: Int64, subtaskId: Int64, isCompleted: Bool, timestamp: Date = Date()) {
         self.taskId = taskId
         self.subtaskId = subtaskId
         self.isCompleted = isCompleted
+        self.isCancelled = isCompleted ? false : nil
         self.timestamp = timestamp
+    }
+
+    public init(taskId: Int64, subtaskId: Int64, isCancelled: Bool, timestamp: Date = Date()) {
+        self.taskId = taskId
+        self.subtaskId = subtaskId
+        self.isCompleted = isCancelled ? false : nil
+        self.isCancelled = isCancelled
+        self.timestamp = timestamp
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case taskId, subtaskId, isCompleted, isCancelled, timestamp
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        taskId = try container.decode(Int64.self, forKey: .taskId)
+        subtaskId = try container.decode(Int64.self, forKey: .subtaskId)
+        isCompleted = try container.decodeIfPresent(Bool.self, forKey: .isCompleted)
+        isCancelled = try container.decodeIfPresent(Bool.self, forKey: .isCancelled)
+        timestamp = try container.decodeIfPresent(Date.self, forKey: .timestamp) ?? Date()
     }
 }
 
@@ -204,6 +235,12 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
                     task.subtasksCompleted = completedCount
                     task.subtasksCancelled = cancelledCount
                     task.progressPercent = effectiveTotal <= 0 ? (subtasks.isEmpty ? 0 : 100) : Int(Double(completedCount) / Double(effectiveTotal) * 100)
+                    if completedCount + cancelledCount == subtasks.count && subtasks.count > 0 {
+                        task.status = "done"
+                        task.isFocus = false
+                    } else if !isCompleted && task.status == "done" {
+                        task.status = "in_progress"
+                    }
                 }
                 if task.status != "done" {
                     updatedFocus.append(task)
@@ -228,6 +265,12 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
                     task.subtasksCompleted = completedCount
                     task.subtasksCancelled = cancelledCount
                     task.progressPercent = effectiveTotal <= 0 ? (subtasks.isEmpty ? 0 : 100) : Int(Double(completedCount) / Double(effectiveTotal) * 100)
+                    if completedCount + cancelledCount == subtasks.count && subtasks.count > 0 {
+                        task.status = "done"
+                        task.isFocus = false
+                    } else if !isCompleted && task.status == "done" {
+                        task.status = "in_progress"
+                    }
                 }
                 if task.status != "done" {
                     updatedDeadlines.append(task)
@@ -249,6 +292,98 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
         // 2. Enqueue pending sync for backend
         var pending = getPendingTogglesLocked()
         pending.append(PendingSubtaskToggle(taskId: taskId, subtaskId: subtaskId, isCompleted: isCompleted))
+        if let encoded = try? JSONEncoder().encode(pending) {
+            defaults.set(encoded, forKey: pendingTogglesKey)
+        }
+
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
+    }
+
+    public func toggleSubtaskCancelledLocally(taskId: Int64, subtaskId: Int64, isCancelled: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        // 1. Immediately mutate cached bundle so widget/UI displays state instantly
+        if let data = defaults.data(forKey: widgetBundleKey),
+           let bundle = try? JSONDecoder().decode(WidgetBundleResponse.self, from: data) {
+
+            var updatedFocus: [TaskItem] = []
+            for var task in bundle.focusTasks {
+                if task.id == taskId, var subtasks = task.subtasks {
+                    for i in 0..<subtasks.count {
+                        if subtasks[i].id == subtaskId {
+                            subtasks[i].isCancelled = isCancelled
+                            if isCancelled {
+                                subtasks[i].isCompleted = false
+                            }
+                        }
+                    }
+                    task.subtasks = subtasks
+                    let completedCount = subtasks.filter { $0.isCompleted && !$0.isCancelled }.count
+                    let cancelledCount = subtasks.filter { $0.isCancelled }.count
+                    let effectiveTotal = subtasks.count - cancelledCount
+                    task.subtasksCompleted = completedCount
+                    task.subtasksCancelled = cancelledCount
+                    task.progressPercent = effectiveTotal <= 0 ? (subtasks.isEmpty ? 0 : 100) : Int(Double(completedCount) / Double(effectiveTotal) * 100)
+                    if completedCount + cancelledCount == subtasks.count && subtasks.count > 0 {
+                        task.status = "done"
+                        task.isFocus = false
+                    } else if task.status == "done" {
+                        task.status = "in_progress"
+                    }
+                }
+                if task.status != "done" {
+                    updatedFocus.append(task)
+                }
+            }
+
+            var updatedDeadlines: [TaskItem] = []
+            for var task in bundle.upcomingDeadlines {
+                if task.id == taskId, var subtasks = task.subtasks {
+                    for i in 0..<subtasks.count {
+                        if subtasks[i].id == subtaskId {
+                            subtasks[i].isCancelled = isCancelled
+                            if isCancelled {
+                                subtasks[i].isCompleted = false
+                            }
+                        }
+                    }
+                    task.subtasks = subtasks
+                    let completedCount = subtasks.filter { $0.isCompleted && !$0.isCancelled }.count
+                    let cancelledCount = subtasks.filter { $0.isCancelled }.count
+                    let effectiveTotal = subtasks.count - cancelledCount
+                    task.subtasksCompleted = completedCount
+                    task.subtasksCancelled = cancelledCount
+                    task.progressPercent = effectiveTotal <= 0 ? (subtasks.isEmpty ? 0 : 100) : Int(Double(completedCount) / Double(effectiveTotal) * 100)
+                    if completedCount + cancelledCount == subtasks.count && subtasks.count > 0 {
+                        task.status = "done"
+                        task.isFocus = false
+                    } else if task.status == "done" {
+                        task.status = "in_progress"
+                    }
+                }
+                if task.status != "done" {
+                    updatedDeadlines.append(task)
+                }
+            }
+
+            let newBundle = WidgetBundleResponse(
+                focusTasks: updatedFocus,
+                upcomingDeadlines: updatedDeadlines,
+                completedToday: bundle.completedToday,
+                totalToday: bundle.totalToday
+            )
+
+            if let reencoded = try? JSONEncoder().encode(newBundle) {
+                defaults.set(reencoded, forKey: widgetBundleKey)
+            }
+        }
+
+        // 2. Enqueue pending sync for backend
+        var pending = getPendingTogglesLocked()
+        pending.append(PendingSubtaskToggle(taskId: taskId, subtaskId: subtaskId, isCancelled: isCancelled))
         if let encoded = try? JSONEncoder().encode(pending) {
             defaults.set(encoded, forKey: pendingTogglesKey)
         }
@@ -642,9 +777,9 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
     public func clearPendingToggles(matching items: [PendingSubtaskToggle]) {
         lock.lock()
         defer { lock.unlock() }
-        let set = Set(items.map { "\($0.taskId)_\($0.subtaskId)_\($0.isCompleted)_\($0.timestamp.timeIntervalSince1970)" })
+        let set = Set(items.map { "\($0.taskId)_\($0.subtaskId)_\($0.isCompleted ?? false)_\($0.isCancelled ?? false)_\($0.timestamp.timeIntervalSince1970)" })
         let remaining = getPendingTogglesLocked().filter {
-            !set.contains("\($0.taskId)_\($0.subtaskId)_\($0.isCompleted)_\($0.timestamp.timeIntervalSince1970)")
+            !set.contains("\($0.taskId)_\($0.subtaskId)_\($0.isCompleted ?? false)_\($0.isCancelled ?? false)_\($0.timestamp.timeIntervalSince1970)")
         }
         if let encoded = try? JSONEncoder().encode(remaining) {
             defaults.set(encoded, forKey: pendingTogglesKey)
@@ -675,7 +810,8 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
                     _ = try await APIClient.shared.updateSubtask(
                         taskId: item.taskId,
                         subtaskId: item.subtaskId,
-                        isCompleted: item.isCompleted
+                        isCompleted: item.isCompleted,
+                        isCancelled: item.isCancelled
                     )
                     synced.append(item)
                 } catch {

@@ -10,10 +10,11 @@ public struct SubtaskPaginationHelper {
         let all = task.subtasks ?? []
         guard !all.isEmpty else { return ([], 0, 1, 0) }
 
-        // Prioritize incomplete subtasks first, completed subtasks second (preserving order within each group)
-        let incomplete = all.filter { !$0.isCompleted }
-        let completed = all.filter { $0.isCompleted }
-        let ordered = incomplete + completed
+        // Prioritize incomplete active subtasks first, completed second, skipped third (preserving order within each group)
+        let incomplete = all.filter { !$0.isCompleted && !$0.isCancelled }
+        let completed = all.filter { $0.isCompleted && !$0.isCancelled }
+        let skipped = all.filter { $0.isCancelled }
+        let ordered = incomplete + completed + skipped
 
         let totalPages = max(1, Int(ceil(Double(ordered.count) / Double(pageSize))))
         let page = SharedWidgetDataManager.shared.getSubtaskPage(for: task.id, totalPages: totalPages)
@@ -190,9 +191,11 @@ public struct RecurringTaskWidgetView: View {
 
                 if let task = activeRecurringTask, let count = task.subtasksCount, count > 0 {
                     let done = task.subtasksCompleted ?? 0
+                    let cancelled = task.subtasksCancelled ?? 0
+                    let isAllDone = (done + cancelled) >= count
                     Text("\(done)/\(count)")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundStyle(done == count ? Color(red: 52/255, green: 211/255, blue: 153/255) : Color(red: 56/255, green: 189/255, blue: 248/255))
+                        .foregroundStyle(isAllDone ? Color(red: 52/255, green: 211/255, blue: 153/255) : Color(red: 56/255, green: 189/255, blue: 248/255))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1.5)
                         .background(Color.white.opacity(0.08))
@@ -221,7 +224,7 @@ public struct RecurringTaskWidgetView: View {
                     progressBar(for: task)
 
                     let p = SubtaskPaginationHelper.paginate(task: task, pageSize: 2)
-                    let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted }
+                    let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
 
                     if allChecked {
                         smallActionsBar(taskId: task.id)
@@ -295,6 +298,8 @@ public struct RecurringTaskWidgetView: View {
 
                 if let task = activeRecurringTask, let count = task.subtasksCount, count > 0 {
                     let done = task.subtasksCompleted ?? 0
+                    let cancelled = task.subtasksCancelled ?? 0
+                    let isAllDone = (done + cancelled) >= count
                     let p = SubtaskPaginationHelper.paginate(task: task, pageSize: 3)
 
                     HStack(spacing: 5) {
@@ -303,12 +308,12 @@ public struct RecurringTaskWidgetView: View {
                         }
 
                         HStack(spacing: 4) {
-                            Image(systemName: done == count ? "checkmark.seal.fill" : "circle.dashed")
+                            Image(systemName: isAllDone ? "checkmark.seal.fill" : "circle.dashed")
                                 .font(.system(size: 11))
                             Text(L10n.Widgets.recurringSubtasksDone(done: done, total: count))
                                 .font(.system(size: 11, weight: .bold))
                         }
-                        .foregroundStyle(done == count ? Color(red: 52/255, green: 211/255, blue: 153/255) : Color(red: 56/255, green: 189/255, blue: 248/255))
+                        .foregroundStyle(isAllDone ? Color(red: 52/255, green: 211/255, blue: 153/255) : Color(red: 56/255, green: 189/255, blue: 248/255))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
                         .background(Color.white.opacity(0.08))
@@ -343,7 +348,7 @@ public struct RecurringTaskWidgetView: View {
                     progressBar(for: task)
 
                     let p = SubtaskPaginationHelper.paginate(task: task, pageSize: 3)
-                    let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted }
+                    let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
 
                     if allChecked {
                         statusActionBar(taskId: task.id)
@@ -418,9 +423,11 @@ public struct RecurringTaskWidgetView: View {
 
                 if let task = activeRecurringTask, let count = task.subtasksCount, count > 0 {
                     let done = task.subtasksCompleted ?? 0
+                    let cancelled = task.subtasksCancelled ?? 0
+                    let isAllDone = (done + cancelled) >= count
                     Text(L10n.Widgets.recurringSubtasksDone(done: done, total: count))
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(red: 52/255, green: 211/255, blue: 153/255))
+                        .foregroundStyle(isAllDone ? Color(red: 52/255, green: 211/255, blue: 153/255) : Color(red: 56/255, green: 189/255, blue: 248/255))
                 }
             }
 
@@ -436,7 +443,7 @@ public struct RecurringTaskWidgetView: View {
                     progressBar(for: task)
 
                     let p = SubtaskPaginationHelper.paginate(task: task, pageSize: 5)
-                    let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted }
+                    let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
 
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(p.subtasks) { st in
@@ -475,9 +482,15 @@ public struct RecurringTaskWidgetView: View {
 
     @ViewBuilder
     private func progressBar(for task: TaskItem) -> some View {
-        let total = max(task.subtasksCount ?? 0, 1)
-        let done = min(task.subtasksCompleted ?? 0, total)
-        let ratio = CGFloat(done) / CGFloat(total)
+        let ratio: CGFloat = {
+            if let percent = task.progressPercent {
+                return CGFloat(min(max(percent, 0), 100)) / 100.0
+            }
+            let cancelled = task.subtasksCancelled ?? 0
+            let effectiveTotal = max((task.subtasksCount ?? 0) - cancelled, 1)
+            let done = min(task.subtasksCompleted ?? 0, effectiveTotal)
+            return CGFloat(done) / CGFloat(effectiveTotal)
+        }()
 
         GeometryReader { geo in
             ZStack(alignment: .leading) {
@@ -505,21 +518,47 @@ public struct RecurringTaskWidgetView: View {
     @ViewBuilder
     private func subtaskRow(taskId: Int64, subtask: Subtask, isCompact: Bool) -> some View {
         HStack(spacing: 8) {
-            Button(intent: ToggleSubtaskIntent(taskId: taskId, subtaskId: subtask.id, isCompleted: !subtask.isCompleted)) {
-                Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: isCompact ? 13 : 15, weight: .semibold))
-                    .foregroundStyle(subtask.isCompleted ? Color(red: 52/255, green: 211/255, blue: 153/255) : .white.opacity(0.45))
+            if subtask.isCancelled {
+                Button(intent: ToggleSubtaskCancelledIntent(taskId: taskId, subtaskId: subtask.id, isCancelled: false)) {
+                    Image(systemName: "slash.circle.fill")
+                        .font(.system(size: isCompact ? 13 : 15, weight: .semibold))
+                        .foregroundStyle(Color.orange)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button(intent: ToggleSubtaskIntent(taskId: taskId, subtaskId: subtask.id, isCompleted: !subtask.isCompleted)) {
+                    Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: isCompact ? 13 : 15, weight: .semibold))
+                        .foregroundStyle(subtask.isCompleted ? Color(red: 52/255, green: 211/255, blue: 153/255) : .white.opacity(0.45))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
             Text(subtask.title)
-                .font(.system(size: isCompact ? 11 : 12, weight: subtask.isCompleted ? .regular : .medium))
+                .font(.system(size: isCompact ? 11 : 12, weight: (subtask.isCompleted || subtask.isCancelled) ? .regular : .medium))
                 .lineLimit(2)
-                .strikethrough(subtask.isCompleted, color: .white.opacity(0.35))
-                .foregroundStyle(subtask.isCompleted ? .white.opacity(0.4) : .white)
+                .strikethrough(subtask.isCompleted || subtask.isCancelled, color: .white.opacity(0.35))
+                .foregroundStyle((subtask.isCompleted || subtask.isCancelled) ? .white.opacity(0.4) : .white)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer()
+
+            if subtask.isCancelled {
+                Text(L10n.Tasks.skipSubtask)
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Color.orange.opacity(0.85))
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1.5)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(Capsule())
+            } else if !subtask.isCompleted && !isCompact {
+                Button(intent: ToggleSubtaskCancelledIntent(taskId: taskId, subtaskId: subtask.id, isCancelled: true)) {
+                    Image(systemName: "slash.circle")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.35))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, isCompact ? 4 : 5)
@@ -784,7 +823,7 @@ public struct CustomTaskWidgetView: View {
                 }
 
                 let p = SubtaskPaginationHelper.paginate(task: task, pageSize: 2)
-                let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted }
+                let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
 
                 if allChecked {
                     Button(intent: UpdateTaskStatusIntent(taskId: task.id, newStatus: "done")) {
@@ -892,7 +931,7 @@ public struct CustomTaskWidgetView: View {
                 }
 
                 let p = SubtaskPaginationHelper.paginate(task: task, pageSize: 3)
-                let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted }
+                let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
 
                 if allChecked {
                     HStack(spacing: 8) {
@@ -1001,7 +1040,7 @@ public struct CustomTaskWidgetView: View {
                     .foregroundStyle(.white)
 
                 let p = SubtaskPaginationHelper.paginate(task: task, pageSize: 5)
-                let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted }
+                let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
 
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(p.subtasks) { st in
@@ -1051,21 +1090,47 @@ public struct CustomTaskWidgetView: View {
     @ViewBuilder
     private func subtaskRow(taskId: Int64, subtask: Subtask, isCompact: Bool) -> some View {
         HStack(spacing: 8) {
-            Button(intent: ToggleSubtaskIntent(taskId: taskId, subtaskId: subtask.id, isCompleted: !subtask.isCompleted)) {
-                Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: isCompact ? 13 : 15, weight: .semibold))
-                    .foregroundStyle(subtask.isCompleted ? Color(red: 52/255, green: 211/255, blue: 153/255) : .white.opacity(0.45))
+            if subtask.isCancelled {
+                Button(intent: ToggleSubtaskCancelledIntent(taskId: taskId, subtaskId: subtask.id, isCancelled: false)) {
+                    Image(systemName: "slash.circle.fill")
+                        .font(.system(size: isCompact ? 13 : 15, weight: .semibold))
+                        .foregroundStyle(Color.orange)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button(intent: ToggleSubtaskIntent(taskId: taskId, subtaskId: subtask.id, isCompleted: !subtask.isCompleted)) {
+                    Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: isCompact ? 13 : 15, weight: .semibold))
+                        .foregroundStyle(subtask.isCompleted ? Color(red: 52/255, green: 211/255, blue: 153/255) : .white.opacity(0.45))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
             Text(subtask.title)
-                .font(.system(size: isCompact ? 11 : 12, weight: subtask.isCompleted ? .regular : .medium))
+                .font(.system(size: isCompact ? 11 : 12, weight: (subtask.isCompleted || subtask.isCancelled) ? .regular : .medium))
                 .lineLimit(2)
-                .strikethrough(subtask.isCompleted, color: .white.opacity(0.35))
-                .foregroundStyle(subtask.isCompleted ? .white.opacity(0.4) : .white)
+                .strikethrough(subtask.isCompleted || subtask.isCancelled, color: .white.opacity(0.35))
+                .foregroundStyle((subtask.isCompleted || subtask.isCancelled) ? .white.opacity(0.4) : .white)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer()
+
+            if subtask.isCancelled {
+                Text(L10n.Tasks.skipSubtask)
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Color.orange.opacity(0.85))
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1.5)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(Capsule())
+            } else if !subtask.isCompleted && !isCompact {
+                Button(intent: ToggleSubtaskCancelledIntent(taskId: taskId, subtaskId: subtask.id, isCancelled: true)) {
+                    Image(systemName: "slash.circle")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.35))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, isCompact ? 4 : 5)

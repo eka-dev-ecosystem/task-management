@@ -46,6 +46,48 @@ public struct ToggleSubtaskIntent: AppIntent {
     }
 }
 
+public struct ToggleSubtaskCancelledIntent: AppIntent {
+    public static var title: LocalizedStringResource = "Toggle Subtask Cancelled"
+    public static var description = IntentDescription("Skip or unskip subtasks instantly from the widget.")
+
+    @Parameter(title: "Task ID")
+    public var taskId: Int
+
+    @Parameter(title: "Subtask ID")
+    public var subtaskId: Int
+
+    @Parameter(title: "Is Cancelled")
+    public var isCancelled: Bool
+
+    public init() {
+        self.taskId = 0
+        self.subtaskId = 0
+        self.isCancelled = false
+    }
+
+    public init(taskId: Int64, subtaskId: Int64, isCancelled: Bool) {
+        self.taskId = Int(taskId)
+        self.subtaskId = Int(subtaskId)
+        self.isCancelled = isCancelled
+    }
+
+    public func perform() async throws -> some IntentResult {
+        SharedWidgetDataManager.shared.toggleSubtaskCancelledLocally(
+            taskId: Int64(taskId),
+            subtaskId: Int64(subtaskId),
+            isCancelled: isCancelled
+        )
+
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
+
+        await SharedWidgetDataManager.shared.syncWithBackend()
+
+        return .result()
+    }
+}
+
 public struct UpdateTaskStatusIntent: AppIntent {
     public static var title: LocalizedStringResource = "Update Task Status"
     public static var description = IntentDescription("Update task status directly from the widget.")
