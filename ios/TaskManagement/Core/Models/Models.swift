@@ -140,15 +140,26 @@ public struct Subtask: Codable, Identifiable, Sendable, Equatable {
     public var title: String
     public var description: String?
     public var isCompleted: Bool
+    public var isCancelled: Bool
     public let orderIndex: Int
     public let dueDate: String?
 
-    public init(id: Int64, taskId: Int64, title: String, description: String? = nil, isCompleted: Bool, orderIndex: Int, dueDate: String? = nil) {
+    public init(
+        id: Int64,
+        taskId: Int64,
+        title: String,
+        description: String? = nil,
+        isCompleted: Bool,
+        isCancelled: Bool = false,
+        orderIndex: Int,
+        dueDate: String? = nil
+    ) {
         self.id = id
         self.taskId = taskId
         self.title = title
         self.description = description
         self.isCompleted = isCompleted
+        self.isCancelled = isCancelled
         self.orderIndex = orderIndex
         self.dueDate = dueDate
     }
@@ -157,8 +168,21 @@ public struct Subtask: Codable, Identifiable, Sendable, Equatable {
         case id, title, description
         case taskId = "task_id"
         case isCompleted = "is_completed"
+        case isCancelled = "is_cancelled"
         case orderIndex = "order_index"
         case dueDate = "due_date"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int64.self, forKey: .id)
+        taskId = try container.decode(Int64.self, forKey: .taskId)
+        title = try container.decode(String.self, forKey: .title)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        isCompleted = try container.decode(Bool.self, forKey: .isCompleted)
+        isCancelled = try container.decodeIfPresent(Bool.self, forKey: .isCancelled) ?? false
+        orderIndex = try container.decode(Int.self, forKey: .orderIndex)
+        dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
     }
 }
 
@@ -179,6 +203,7 @@ public struct TaskItem: Codable, Identifiable, Sendable, Equatable {
     public var subtasks: [Subtask]?
     public var subtasksCount: Int?
     public var subtasksCompleted: Int?
+    public var subtasksCancelled: Int?
     public var progressPercent: Int?
     public let isRecurring: Bool?
     public let recurrencePattern: String?
@@ -204,6 +229,7 @@ public struct TaskItem: Codable, Identifiable, Sendable, Equatable {
         subtasks: [Subtask]?,
         subtasksCount: Int?,
         subtasksCompleted: Int?,
+        subtasksCancelled: Int? = nil,
         progressPercent: Int?,
         isRecurring: Bool?,
         recurrencePattern: String?,
@@ -228,6 +254,7 @@ public struct TaskItem: Codable, Identifiable, Sendable, Equatable {
         self.subtasks = subtasks
         self.subtasksCount = subtasksCount
         self.subtasksCompleted = subtasksCompleted
+        self.subtasksCancelled = subtasksCancelled
         self.progressPercent = progressPercent
         self.isRecurring = isRecurring
         self.recurrencePattern = recurrencePattern
@@ -249,6 +276,7 @@ public struct TaskItem: Codable, Identifiable, Sendable, Equatable {
         case subtasks
         case subtasksCount = "subtasks_count"
         case subtasksCompleted = "subtasks_completed"
+        case subtasksCancelled = "subtasks_cancelled"
         case progressPercent = "progress_percent"
         case isRecurring = "is_recurring"
         case recurrencePattern = "recurrence_pattern"
@@ -612,6 +640,7 @@ public struct UpdateSubtaskRequest: Codable {
     public let title: String?
     public let description: String?
     public let isCompleted: Bool?
+    public let isCancelled: Bool?
     public let dueDate: String?
     public let clearDueDate: Bool
 
@@ -619,12 +648,14 @@ public struct UpdateSubtaskRequest: Codable {
         title: String? = nil,
         description: String? = nil,
         isCompleted: Bool? = nil,
+        isCancelled: Bool? = nil,
         dueDate: String? = nil,
         clearDueDate: Bool = false
     ) {
         self.title = title
         self.description = description
         self.isCompleted = isCompleted
+        self.isCancelled = isCancelled
         self.dueDate = dueDate
         self.clearDueDate = clearDueDate
     }
@@ -632,6 +663,7 @@ public struct UpdateSubtaskRequest: Codable {
     enum CodingKeys: String, CodingKey {
         case title, description
         case isCompleted = "is_completed"
+        case isCancelled = "is_cancelled"
         case dueDate = "due_date"
     }
 
@@ -640,6 +672,7 @@ public struct UpdateSubtaskRequest: Codable {
         try container.encodeIfPresent(title, forKey: .title)
         try container.encodeIfPresent(description, forKey: .description)
         try container.encodeIfPresent(isCompleted, forKey: .isCompleted)
+        try container.encodeIfPresent(isCancelled, forKey: .isCancelled)
         if clearDueDate {
             try container.encodeNil(forKey: .dueDate)
         } else {
@@ -652,6 +685,7 @@ public struct UpdateSubtaskRequest: Codable {
         title = try container.decodeIfPresent(String.self, forKey: .title)
         description = try container.decodeIfPresent(String.self, forKey: .description)
         isCompleted = try container.decodeIfPresent(Bool.self, forKey: .isCompleted)
+        isCancelled = try container.decodeIfPresent(Bool.self, forKey: .isCancelled)
         dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
         clearDueDate = false
     }

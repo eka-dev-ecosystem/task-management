@@ -263,7 +263,13 @@ public struct TaskDetailSheet: View {
                 // Subtasks Section
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text("SUBTASKS (\(currentTask.subtasksCompleted ?? 0)/\(currentTask.subtasksCount ?? 0))")
+                        let cancelledInfo: String = {
+                            if let c = currentTask.subtasksCancelled, c > 0 {
+                                return " • \(c) \(L10n.Tasks.subtaskSkipped.lowercased())"
+                            }
+                            return ""
+                        }()
+                        Text("SUBTASKS (\(currentTask.subtasksCompleted ?? 0)/\(currentTask.subtasksCount ?? 0)\(cancelledInfo))")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.secondary)
                         Spacer()
@@ -292,6 +298,9 @@ public struct TaskDetailSheet: View {
                                     isRecurring: currentTask.isRecurring == true,
                                     onToggle: { isCompleted in
                                         viewModel.toggleSubtask(taskId: currentTask.id, subtaskId: subtask.id, currentCompleted: !isCompleted)
+                                    },
+                                    onToggleCancel: {
+                                        viewModel.toggleSubtaskCancelled(taskId: currentTask.id, subtaskId: subtask.id, currentCancelled: subtask.isCancelled)
                                     },
                                     onUpdate: { title, description, dueDate, clearDueDate in
                                         await viewModel.updateSubtask(
@@ -768,6 +777,9 @@ public struct EditTaskSheet: View {
                                 onToggle: { isCompleted in
                                     viewModel.toggleSubtask(taskId: task.id, subtaskId: subtask.id, currentCompleted: !isCompleted)
                                 },
+                                onToggleCancel: {
+                                    viewModel.toggleSubtaskCancelled(taskId: task.id, subtaskId: subtask.id, currentCancelled: subtask.isCancelled)
+                                },
                                 onUpdate: { title, description, dueDate, clearDueDate in
                                     await viewModel.updateSubtask(
                                         taskId: task.id,
@@ -938,6 +950,7 @@ public struct SubtaskItemRowView: View {
     let parentDueDate: String?
     var isRecurring: Bool = false
     let onToggle: (Bool) -> Void
+    let onToggleCancel: () -> Void
     let onUpdate: (String, String?, String?, Bool) async -> Bool
     let onDelete: () async -> Void
 
@@ -955,6 +968,7 @@ public struct SubtaskItemRowView: View {
         parentDueDate: String? = nil,
         isRecurring: Bool = false,
         onToggle: @escaping (Bool) -> Void,
+        onToggleCancel: @escaping () -> Void,
         onUpdate: @escaping (String, String?, String?, Bool) async -> Bool,
         onDelete: @escaping () async -> Void
     ) {
@@ -962,6 +976,7 @@ public struct SubtaskItemRowView: View {
         self.parentDueDate = parentDueDate
         self.isRecurring = isRecurring
         self.onToggle = onToggle
+        self.onToggleCancel = onToggleCancel
         self.onUpdate = onUpdate
         self.onDelete = onDelete
 
@@ -1075,19 +1090,23 @@ public struct SubtaskItemRowView: View {
         HStack(spacing: 10) {
             Button(action: {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                onToggle(!subtask.isCompleted)
+                if subtask.isCancelled {
+                    onToggle(true)
+                } else {
+                    onToggle(!subtask.isCompleted)
+                }
             }) {
-                Image(systemName: subtask.isCompleted ? "checkmark.square.fill" : "square")
+                Image(systemName: subtask.isCompleted ? "checkmark.square.fill" : (subtask.isCancelled ? "slash.circle.fill" : "square"))
                     .font(.system(size: 16))
-                    .foregroundColor(subtask.isCompleted ? AppColors.statusDone : .secondary)
+                    .foregroundColor(subtask.isCompleted ? AppColors.statusDone : (subtask.isCancelled ? .orange : .secondary))
             }
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(subtask.title)
                     .font(.system(size: 13, weight: .medium))
-                    .strikethrough(subtask.isCompleted)
-                    .foregroundColor(subtask.isCompleted ? .secondary : .primary)
+                    .strikethrough(subtask.isCompleted || subtask.isCancelled)
+                    .foregroundColor((subtask.isCompleted || subtask.isCancelled) ? .secondary : .primary)
                     .lineLimit(2)
 
                 if !isExpanded {
@@ -1121,12 +1140,25 @@ public struct SubtaskItemRowView: View {
             }
             .buttonStyle(.plain)
 
-            Button(action: {
-                showDeleteConfirm = true
-            }) {
-                Image(systemName: "trash")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color.secondary.opacity(0.6))
+            Menu {
+                Button {
+                    onToggleCancel()
+                } label: {
+                    Label(
+                        subtask.isCancelled ? L10n.Tasks.unskipSubtask : L10n.Tasks.skipSubtask,
+                        systemImage: subtask.isCancelled ? "arrow.uturn.backward" : "slash.circle"
+                    )
+                }
+
+                Button(role: .destructive) {
+                    showDeleteConfirm = true
+                } label: {
+                    Label(L10n.General.delete, systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color.secondary.opacity(0.7))
                     .frame(width: 26, height: 26)
             }
             .buttonStyle(.plain)
@@ -1138,8 +1170,22 @@ public struct SubtaskItemRowView: View {
     private var badgesRow: some View {
         let hasDesc = (subtask.description != nil && !subtask.description!.isEmpty)
         let hasDue = !isRecurring && (subtask.dueDate != nil && !subtask.dueDate!.isEmpty)
-        if hasDesc || hasDue {
+        if subtask.isCancelled || hasDesc || hasDue {
             HStack(spacing: 6) {
+                if subtask.isCancelled {
+                    HStack(spacing: 3) {
+                        Image(systemName: "slash.circle")
+                            .font(.system(size: 8))
+                        Text(L10n.Tasks.subtaskSkipped)
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.orange.opacity(0.12))
+                    .foregroundColor(.orange)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+
                 if let desc = subtask.description, !desc.isEmpty {
                     HStack(spacing: 3) {
                         Image(systemName: "text.alignleft")
@@ -1249,6 +1295,23 @@ public struct SubtaskItemRowView: View {
     @ViewBuilder
     private var editorButtons: some View {
         HStack(spacing: 8) {
+            Button(action: {
+                onToggleCancel()
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: subtask.isCancelled ? "arrow.uturn.backward" : "slash.circle")
+                        .font(.system(size: 10, weight: .bold))
+                    Text(subtask.isCancelled ? L10n.Tasks.unskipSubtask : L10n.Tasks.skipSubtask)
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundColor(subtask.isCancelled ? AppColors.primary : .orange)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background((subtask.isCancelled ? AppColors.primary : Color.orange).opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+
             Spacer()
             Button(action: handleCancel) {
                 Text(L10n.General.cancel)

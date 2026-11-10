@@ -689,7 +689,13 @@ func (s *service) UpdateSubtask(ctx context.Context, userID string, taskID int64
 				}
 			}
 			var desc string
-			if req.IsCompleted != nil {
+			if req.IsCancelled != nil {
+				if *req.IsCancelled {
+					desc = fmt.Sprintf("Dibatalkan/Dilewati subtask: %s", res.Title)
+				} else {
+					desc = fmt.Sprintf("Diaktifkan kembali subtask: %s", res.Title)
+				}
+			} else if req.IsCompleted != nil {
 				if *req.IsCompleted {
 					desc = fmt.Sprintf("Completed subtask: %s", res.Title)
 				} else {
@@ -702,21 +708,22 @@ func (s *service) UpdateSubtask(ctx context.Context, userID string, taskID int64
 				"subtask_id":   subtaskID,
 				"title":        res.Title,
 				"is_completed": res.IsCompleted,
+				"is_cancelled": res.IsCancelled,
 			})
 			if _, err := s.repo.CreateActivity(ctx, tx, taskID, userID, "subtask_toggled", desc, changesJSON); err != nil {
 				return err
 			}
 
-			if req.IsCompleted != nil {
-				total, completed, countErr := s.repo.CountSubtasks(ctx, tx, taskID)
+			if req.IsCompleted != nil || req.IsCancelled != nil {
+				total, completed, cancelled, countErr := s.repo.CountSubtasks(ctx, tx, taskID)
 				if countErr == nil && total > 0 {
-					if completed == total && entity.Status != "done" {
+					if completed+cancelled == total && entity.Status != "done" {
 						doneStatus := "done"
 						noFocus := false
 						if err := s.updateTaskStatusTx(ctx, tx, userID, taskID, doneStatus, &noFocus); err != nil {
 							return err
 						}
-					} else if completed < total && entity.Status == "done" {
+					} else if completed+cancelled < total && entity.Status == "done" {
 						progressStatus := "in_progress"
 						if err := s.updateTaskStatusTx(ctx, tx, userID, taskID, progressStatus, nil); err != nil {
 							return err
@@ -759,20 +766,14 @@ func (s *service) DeleteSubtask(ctx context.Context, userID string, taskID int64
 		if err := s.repo.DeleteSubtask(ctx, tx, userID, taskID, subtaskID); err != nil {
 			return err
 		}
-		// Sync delete to recurring_subtasks template if this task belongs to a recurring series
-		if entity.RecurringTaskID != nil && subtaskTitle != "" {
-			if err := s.repo.DeleteRecurringSubtaskByTitle(ctx, tx, *entity.RecurringTaskID, subtaskTitle); err != nil {
-				return fmt.Errorf("failed to sync recurring subtask deletion: %w", err)
-			}
-		}
 		desc := fmt.Sprintf("Deleted subtask: %s", subtaskTitle)
 		changesJSON, _ := json.Marshal(map[string]any{"subtask_id": subtaskID, "title": subtaskTitle})
 		if _, err := s.repo.CreateActivity(ctx, tx, taskID, userID, "subtask_deleted", desc, changesJSON); err != nil {
 			return err
 		}
 
-		total, completed, countErr := s.repo.CountSubtasks(ctx, tx, taskID)
-		if countErr == nil && total > 0 && completed == total && entity.Status != "done" {
+		total, completed, cancelled, countErr := s.repo.CountSubtasks(ctx, tx, taskID)
+		if countErr == nil && total > 0 && completed+cancelled == total && entity.Status != "done" {
 			doneStatus := "done"
 			noFocus := false
 			if err := s.updateTaskStatusTx(ctx, tx, userID, taskID, doneStatus, &noFocus); err != nil {

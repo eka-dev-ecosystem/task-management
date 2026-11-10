@@ -45,6 +45,7 @@ export const taskApi = {
       title?: string
       description?: string
       is_completed?: boolean
+      is_cancelled?: boolean
       due_date?: string | null
     }
   ) => apiClient.put<Subtask>(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`, payload),

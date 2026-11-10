@@ -53,6 +53,7 @@ data class Subtask(
     val title: String,
     val description: String = "",
     @SerialName("is_completed") val isCompleted: Boolean,
+    @SerialName("is_cancelled") val isCancelled: Boolean = false,
     @SerialName("order_index") val orderIndex: Int = 0,
     @SerialName("due_date") val dueDate: String? = null
 )
@@ -75,6 +76,7 @@ data class Task(
     val subtasks: List<Subtask> = emptyList(),
     @SerialName("subtasks_count") val subtasksCount: Int = 0,
     @SerialName("subtasks_completed") val subtasksCompleted: Int = 0,
+    @SerialName("subtasks_cancelled") val subtasksCancelled: Int = 0,
     @SerialName("progress_percent") val progressPercent: Int = 0
 )
 
@@ -130,6 +132,7 @@ data class UpdateSubtaskRequest(
     val title: String? = null,
     val description: String? = null,
     @SerialName("is_completed") val isCompleted: Boolean? = null,
+    @SerialName("is_cancelled") val isCancelled: Boolean? = null,
     @SerialName("due_date") val dueDate: String? = null
 )
 

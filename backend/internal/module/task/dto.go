@@ -44,6 +44,7 @@ type SubtaskResponse struct {
 	Title       string     `json:"title" db:"title"`
 	Description string     `json:"description" db:"description"`
 	IsCompleted bool       `json:"is_completed" db:"is_completed"`
+	IsCancelled bool       `json:"is_cancelled" db:"is_cancelled"`
 	OrderIndex  int        `json:"order_index" db:"order_index"`
 	DueDate     *time.Time `json:"due_date" db:"due_date"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
@@ -308,6 +309,7 @@ type UpdateSubtaskRequest struct {
 	ClearDescription bool       `json:"clear_description"`
 	HasDescription   bool       `json:"-"`
 	IsCompleted      *bool      `json:"is_completed"`
+	IsCancelled      *bool      `json:"is_cancelled"`
 	DueDate          *time.Time `json:"due_date"`
 	ClearDueDate     bool       `json:"clear_due_date"`
 	HasDueDate       bool       `json:"-"`
@@ -320,6 +322,7 @@ func (u *UpdateSubtaskRequest) UnmarshalJSON(data []byte) error {
 		Description      *string `json:"description"`
 		ClearDescription bool    `json:"clear_description"`
 		IsCompleted      *bool   `json:"is_completed"`
+		IsCancelled      *bool   `json:"is_cancelled"`
 		ClearDueDate     bool    `json:"clear_due_date"`
 	}
 	var aux Alias
@@ -330,6 +333,7 @@ func (u *UpdateSubtaskRequest) UnmarshalJSON(data []byte) error {
 	u.Description = aux.Description
 	u.ClearDescription = aux.ClearDescription
 	u.IsCompleted = aux.IsCompleted
+	u.IsCancelled = aux.IsCancelled
 	u.ClearDueDate = aux.ClearDueDate
 
 	var raw map[string]interface{}
@@ -415,6 +419,7 @@ type TaskResponse struct {
 	Subtasks                  []SubtaskResponse `json:"subtasks"`
 	SubtasksCount             int               `json:"subtasks_count"`
 	SubtasksCompleted         int               `json:"subtasks_completed"`
+	SubtasksCancelled         int               `json:"subtasks_cancelled"`
 	ProgressPercent           int               `json:"progress_percent"`
 	IsRecurring               bool              `json:"is_recurring" db:"is_recurring"`
 	RecurrencePattern         string            `json:"recurrence_pattern" db:"recurrence_pattern"`

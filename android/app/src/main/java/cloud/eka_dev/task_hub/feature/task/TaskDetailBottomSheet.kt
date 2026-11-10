@@ -270,8 +270,13 @@ private fun DetailTabContent(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                val subtasksHeaderText = if (task.subtasksCancelled > 0) {
+                    "${stringResource(R.string.subtasks_header, task.subtasksCompleted, task.subtasksCount)} • ${task.subtasksCancelled} ${stringResource(R.string.subtask_skipped).lowercase()}"
+                } else {
+                    stringResource(R.string.subtasks_header, task.subtasksCompleted, task.subtasksCount)
+                }
                 Text(
-                    stringResource(R.string.subtasks_header, task.subtasksCompleted, task.subtasksCount),
+                    subtasksHeaderText,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -346,21 +351,52 @@ private fun DetailTabContent(
                             .padding(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Checkbox(
-                            checked = subtask.isCompleted,
-                            onCheckedChange = {
-                                viewModel.toggleSubtask(task.id, subtask.id, subtask.isCompleted)
-                            },
-                            colors = CheckboxDefaults.colors(checkedColor = StatusDone)
-                        )
+                        if (subtask.isCancelled) {
+                            IconButton(
+                                onClick = {
+                                    viewModel.toggleSubtask(task.id, subtask.id, false)
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Remove,
+                                    contentDescription = stringResource(R.string.subtask_skipped),
+                                    tint = Color(0xFFF97316),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        } else {
+                            Checkbox(
+                                checked = subtask.isCompleted,
+                                onCheckedChange = {
+                                    viewModel.toggleSubtask(task.id, subtask.id, subtask.isCompleted)
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = StatusDone)
+                            )
+                        }
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = subtask.title,
                                 fontSize = 13.sp,
-                                textDecoration = if (subtask.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                                color = if (subtask.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                                textDecoration = if (subtask.isCompleted || subtask.isCancelled) TextDecoration.LineThrough else TextDecoration.None,
+                                color = if (subtask.isCompleted || subtask.isCancelled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                             )
+                            if (subtask.isCancelled) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Surface(
+                                    color = Color(0xFFF97316).copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.subtask_skipped),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFEA580C),
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
                             if (subtask.description.isNotBlank()) {
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
@@ -379,6 +415,18 @@ private fun DetailTabContent(
                                 )
                             }
                         }
+                        IconButton(
+                            onClick = { viewModel.toggleSubtaskCancelled(task.id, subtask.id, subtask.isCancelled) },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                if (subtask.isCancelled) Icons.Default.Undo else Icons.Default.Remove,
+                                contentDescription = stringResource(if (subtask.isCancelled) R.string.unskip_subtask else R.string.skip_subtask),
+                                tint = if (subtask.isCancelled) BrandPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
                         IconButton(
                             onClick = { viewModel.deleteSubtask(task.id, subtask.id) },
                             modifier = Modifier.size(24.dp)

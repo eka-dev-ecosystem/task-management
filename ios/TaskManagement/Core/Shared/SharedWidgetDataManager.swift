@@ -192,12 +192,18 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
                     for i in 0..<subtasks.count {
                         if subtasks[i].id == subtaskId {
                             subtasks[i].isCompleted = isCompleted
+                            if isCompleted {
+                                subtasks[i].isCancelled = false
+                            }
                         }
                     }
                     task.subtasks = subtasks
-                    let completedCount = subtasks.filter { $0.isCompleted }.count
+                    let completedCount = subtasks.filter { $0.isCompleted && !$0.isCancelled }.count
+                    let cancelledCount = subtasks.filter { $0.isCancelled }.count
+                    let effectiveTotal = subtasks.count - cancelledCount
                     task.subtasksCompleted = completedCount
-                    task.progressPercent = subtasks.isEmpty ? 0 : Int(Double(completedCount) / Double(subtasks.count) * 100)
+                    task.subtasksCancelled = cancelledCount
+                    task.progressPercent = effectiveTotal <= 0 ? (subtasks.isEmpty ? 0 : 100) : Int(Double(completedCount) / Double(effectiveTotal) * 100)
                 }
                 if task.status != "done" {
                     updatedFocus.append(task)
@@ -210,12 +216,18 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
                     for i in 0..<subtasks.count {
                         if subtasks[i].id == subtaskId {
                             subtasks[i].isCompleted = isCompleted
+                            if isCompleted {
+                                subtasks[i].isCancelled = false
+                            }
                         }
                     }
                     task.subtasks = subtasks
-                    let completedCount = subtasks.filter { $0.isCompleted }.count
+                    let completedCount = subtasks.filter { $0.isCompleted && !$0.isCancelled }.count
+                    let cancelledCount = subtasks.filter { $0.isCancelled }.count
+                    let effectiveTotal = subtasks.count - cancelledCount
                     task.subtasksCompleted = completedCount
-                    task.progressPercent = subtasks.isEmpty ? 0 : Int(Double(completedCount) / Double(subtasks.count) * 100)
+                    task.subtasksCancelled = cancelledCount
+                    task.progressPercent = effectiveTotal <= 0 ? (subtasks.isEmpty ? 0 : 100) : Int(Double(completedCount) / Double(effectiveTotal) * 100)
                 }
                 if task.status != "done" {
                     updatedDeadlines.append(task)

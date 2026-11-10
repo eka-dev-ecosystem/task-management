@@ -800,7 +800,8 @@ export const useUpdateSubtask = () => {
       title,
       description,
       dueDate,
-      isCompleted
+      isCompleted,
+      isCancelled
     }: {
       taskId: number
       subtaskId: number
@@ -808,12 +809,14 @@ export const useUpdateSubtask = () => {
       description?: string
       dueDate?: string | null
       isCompleted?: boolean
+      isCancelled?: boolean
     }) => {
       const res = await taskApi.updateSubtask(taskId, subtaskId, {
         title,
         description,
         due_date: dueDate,
-        is_completed: isCompleted
+        is_completed: isCompleted,
+        is_cancelled: isCancelled
       })
       return { taskId, subtask: res.data }
     },
@@ -829,6 +832,7 @@ export const useUpdateSubtask = () => {
         }
       })
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId), refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: taskKeys.all, refetchType: 'all' })
     },
     onError: (err) => {
       toast.error(err)

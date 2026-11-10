@@ -114,6 +114,9 @@ export const taskDrawer = {
   subtaskCollapseTooltip: 'Collapse subtask details',
   subtaskSaveTooltip: 'Save subtask changes',
   subtaskCancelTooltip: 'Cancel changes',
+  subtaskSkipped: 'Skipped',
+  skipSubtask: 'Skip Subtask',
+  unskipSubtask: 'Reactivate Subtask',
   deleteTaskConfirmHeader: 'Delete Task',
   deleteTaskConfirmMessage:
     'Are you sure you want to delete this task? This action cannot be undone.',

@@ -27,6 +27,7 @@ interface SubtaskItemRowProps {
   taskId: number
   isRecurring?: boolean
   onToggle: (completed: boolean) => void
+  onToggleCancel: (cancelled: boolean) => void
   onDelete: (id: number, title: string) => void
   onUpdate: (params: {
     taskId: number
@@ -42,6 +43,7 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
   taskId,
   isRecurring = false,
   onToggle,
+  onToggleCancel,
   onDelete,
   onUpdate
 }) => {
@@ -107,13 +109,19 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
           <input
             type="checkbox"
             checked={subtask.is_completed}
-            onChange={(e) => onToggle(e.target.checked)}
+            onChange={(e) => {
+              if (subtask.is_cancelled) {
+                onToggle(true)
+              } else {
+                onToggle(e.target.checked)
+              }
+            }}
             className="mt-0.5 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-indigo-600 focus:ring-0 shrink-0 cursor-pointer"
           />
           <div className="flex-1 min-w-0 space-y-1">
             <span
               className={`block break-words leading-relaxed text-xs sm:text-sm ${
-                subtask.is_completed
+                subtask.is_completed || subtask.is_cancelled
                   ? 'line-through text-slate-400 dark:text-slate-500'
                   : 'text-slate-800 dark:text-slate-200 font-medium'
               }`}
@@ -123,10 +131,17 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
 
             {/* Badges: Due Date & Notes Preview */}
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              {subtask.is_cancelled && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
+                  <i className="pi pi-ban text-[9px]" />
+                  {t('taskDrawer.subtaskSkipped')}
+                </span>
+              )}
+
               {formattedDueDate && (
                 <span
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium ${
-                    subtask.is_completed
+                    subtask.is_completed || subtask.is_cancelled
                       ? 'bg-slate-100 dark:bg-slate-800 text-slate-400'
                       : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50'
                   }`}
@@ -155,6 +170,22 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
 
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0 pt-0.5">
+          <button
+            type="button"
+            onClick={() => onToggleCancel(!subtask.is_cancelled)}
+            data-pr-tooltip={
+              subtask.is_cancelled
+                ? t('taskDrawer.unskipSubtask')
+                : t('taskDrawer.skipSubtask')
+            }
+            className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+              subtask.is_cancelled
+                ? 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400'
+                : 'border-transparent text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50'
+            }`}
+          >
+            <i className={`pi ${subtask.is_cancelled ? 'pi-undo' : 'pi-ban'} text-[10px]`} />
+          </button>
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
@@ -246,6 +277,18 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
           )}
 
           <div className="flex items-center justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => onToggleCancel(!subtask.is_cancelled)}
+              className={`mr-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                subtask.is_cancelled
+                  ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400'
+                  : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <i className={`pi ${subtask.is_cancelled ? 'pi-undo' : 'pi-ban'} text-[10px]`} />
+              {subtask.is_cancelled ? t('taskDrawer.unskipSubtask') : t('taskDrawer.skipSubtask')}
+            </button>
             <button
               type="button"
               onClick={handleCancel}
@@ -785,10 +828,17 @@ export const TaskDetailModal: React.FC = () => {
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                       <i className="pi pi-check-square text-indigo-500 dark:text-indigo-400" />
-                      {t('taskDrawer.subtasksChecklist', {
-                        completed: task.subtasks_completed,
-                        total: task.subtasks_count
-                      })}
+                      <span>
+                        {t('taskDrawer.subtasksChecklist', {
+                          completed: task.subtasks_completed,
+                          total: task.subtasks_count
+                        })}
+                        {Boolean(task.subtasks_cancelled && task.subtasks_cancelled > 0) && (
+                          <span className="ml-1.5 text-xs text-amber-600 dark:text-amber-400 font-normal">
+                            • {task.subtasks_cancelled} {t('taskDrawer.subtaskSkipped').toLowerCase()}
+                          </span>
+                        )}
+                      </span>
                     </span>
                     <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/50 dark:border-indigo-800/50">
                       {task.progress_percent}%
@@ -816,6 +866,13 @@ export const TaskDetailModal: React.FC = () => {
                             taskId: task.id,
                             subtaskId: st.id,
                             isCompleted: checked
+                          })
+                        }
+                        onToggleCancel={(cancelled) =>
+                          updateSubtaskMutation.mutateAsync({
+                            taskId: task.id,
+                            subtaskId: st.id,
+                            isCancelled: cancelled
                           })
                         }
                         onDelete={handleDeleteSubtask}

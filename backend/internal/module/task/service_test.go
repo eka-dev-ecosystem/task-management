@@ -38,7 +38,7 @@ type mockRepository struct {
 	createSubtaskFunc func(ctx context.Context, userID string, taskID int64, req CreateSubtaskRequest) (*SubtaskResponse, error)
 	updateSubtaskFunc func(ctx context.Context, userID string, taskID int64, subtaskID int64, req UpdateSubtaskRequest) (*SubtaskResponse, error)
 	deleteSubtaskFunc func(ctx context.Context, userID string, taskID int64, subtaskID int64) error
-	countSubtasksFunc func(ctx context.Context, taskID int64) (int, int, error)
+	countSubtasksFunc func(ctx context.Context, taskID int64) (int, int, int, error)
 
 	findByIDSystemFunc     func(ctx context.Context, id int64) (*TaskResponse, string, string, int, bool, error)
 	markDueWarningSentFunc func(ctx context.Context, id int64) error
@@ -160,11 +160,11 @@ func (m *mockRepository) DeleteSubtask(ctx context.Context, tx *sqlx.Tx, userID 
 	return nil
 }
 
-func (m *mockRepository) CountSubtasks(ctx context.Context, tx *sqlx.Tx, taskID int64) (int, int, error) {
+func (m *mockRepository) CountSubtasks(ctx context.Context, tx *sqlx.Tx, taskID int64) (int, int, int, error) {
 	if m.countSubtasksFunc != nil {
 		return m.countSubtasksFunc(ctx, taskID)
 	}
-	return 0, 0, nil
+	return 0, 0, 0, nil
 }
 
 func (m *mockRepository) FindByIDSystem(ctx context.Context, tx *sqlx.Tx, id int64) (*TaskResponse, string, string, int, bool, error) {
@@ -944,8 +944,8 @@ func TestTaskService_AutoCompletionAndUnfocus(t *testing.T) {
 			createActivityFunc: func(ctx context.Context, tID int64, uID string, actType string, desc string, ch []byte) (*TaskActivityResponse, error) {
 				return &TaskActivityResponse{ID: 1}, nil
 			},
-			countSubtasksFunc: func(ctx context.Context, tID int64) (int, int, error) {
-				return 2, 2, nil // 2 of 2 completed
+			countSubtasksFunc: func(ctx context.Context, tID int64) (int, int, int, error) {
+				return 2, 2, 0, nil // 2 of 2 completed
 			},
 			updateFunc: func(ctx context.Context, uID string, id int64, req UpdateTaskRequest) (*TaskResponse, error) {
 				if req.Status != nil && *req.Status == "done" {
@@ -1007,8 +1007,8 @@ func TestTaskService_AutoCompletionAndUnfocus(t *testing.T) {
 			createActivityFunc: func(ctx context.Context, tID int64, uID string, actType string, desc string, ch []byte) (*TaskActivityResponse, error) {
 				return &TaskActivityResponse{ID: 2}, nil
 			},
-			countSubtasksFunc: func(ctx context.Context, tID int64) (int, int, error) {
-				return 2, 1, nil // 1 of 2 completed
+			countSubtasksFunc: func(ctx context.Context, tID int64) (int, int, int, error) {
+				return 2, 1, 0, nil // 1 of 2 completed
 			},
 			updateFunc: func(ctx context.Context, uID string, id int64, req UpdateTaskRequest) (*TaskResponse, error) {
 				if req.Status != nil && *req.Status == "in_progress" {
@@ -1034,6 +1034,61 @@ func TestTaskService_AutoCompletionAndUnfocus(t *testing.T) {
 		}
 		if !parentRevertedToInProgress {
 			t.Errorf("expected parent task status to revert to 'in_progress'")
+		}
+	})
+
+	t.Run("cancelling remaining subtask triggers parent task done when completed + cancelled == total", func(t *testing.T) {
+		var parentUpdatedWithDone bool
+
+		mockRepo := &mockRepository{
+			findByIDFunc: func(ctx context.Context, uID string, id int64) (*TaskResponse, error) {
+				return &TaskResponse{
+					ID:      taskID,
+					UserID:  userID,
+					Title:   "Master Task",
+					Status:  "in_progress",
+					IsFocus: true,
+				}, nil
+			},
+			updateSubtaskFunc: func(ctx context.Context, uID string, tID int64, sID int64, req UpdateSubtaskRequest) (*SubtaskResponse, error) {
+				return &SubtaskResponse{
+					ID:          sID,
+					TaskID:      tID,
+					Title:       "Subtask 2",
+					IsCancelled: true,
+				}, nil
+			},
+			createActivityFunc: func(ctx context.Context, tID int64, uID string, actType string, desc string, ch []byte) (*TaskActivityResponse, error) {
+				return &TaskActivityResponse{ID: 3}, nil
+			},
+			countSubtasksFunc: func(ctx context.Context, tID int64) (int, int, int, error) {
+				// total 2, 1 completed, 1 cancelled -> completed + cancelled == total
+				return 2, 1, 1, nil
+			},
+			updateFunc: func(ctx context.Context, uID string, id int64, req UpdateTaskRequest) (*TaskResponse, error) {
+				if req.Status != nil && *req.Status == "done" {
+					parentUpdatedWithDone = true
+				}
+				return &TaskResponse{
+					ID:     id,
+					Status: "done",
+				}, nil
+			},
+			getUserThresholdFunc: func(ctx context.Context, uID string) (int, string, error) {
+				return 30, "Asia/Jakarta", nil
+			},
+		}
+
+		svc := NewService(mockRepo, &mockTransactor{})
+		isCanc := true
+		_, err := svc.UpdateSubtask(ctx, userID, taskID, 2, UpdateSubtaskRequest{
+			IsCancelled: &isCanc,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !parentUpdatedWithDone {
+			t.Errorf("expected parent task status to transition to 'done' when completed + cancelled == total")
 		}
 	})
 }
@@ -1376,13 +1431,13 @@ func TestTaskService_RecurringSubtasksSync(t *testing.T) {
 		t.Errorf("expected updated recurring subtask 'Renamed Subtask', got '%s'", updatedRecSubtaskTitle)
 	}
 
-	// 3. DeleteSubtask on recurring task instance
+	// 3. DeleteSubtask on recurring task instance (does NOT delete from recurring subtask master template)
 	err = svc.DeleteSubtask(ctx, testUserID, taskID, 1)
 	if err != nil {
 		t.Fatalf("DeleteSubtask failed: %v", err)
 	}
-	if deletedRecSubtaskTitle != "Old Subtask" {
-		t.Errorf("expected deleted recurring subtask 'Old Subtask', got '%s'", deletedRecSubtaskTitle)
+	if deletedRecSubtaskTitle != "" {
+		t.Errorf("expected deleted recurring subtask to NOT be called on master template, got '%s'", deletedRecSubtaskTitle)
 	}
 
 	// 4. Update on recurring task instance
@@ -1452,10 +1507,10 @@ func TestTaskService_RecurringSubtasksSync_Errors(t *testing.T) {
 		t.Fatal("expected error on UpdateSubtask when recurring subtask update fails, got nil")
 	}
 
-	// 3. DeleteSubtask error
+	// 3. DeleteSubtask on instance does not propagate to recurring subtask master, so it succeeds
 	err = svc.DeleteSubtask(ctx, testUserID, taskID, 1)
-	if err == nil {
-		t.Fatal("expected error on DeleteSubtask when recurring subtask deletion fails, got nil")
+	if err != nil {
+		t.Fatalf("expected DeleteSubtask to succeed without touching master template: %v", err)
 	}
 }
 

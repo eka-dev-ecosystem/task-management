@@ -532,6 +532,28 @@ public final class TaskViewModel {
     }
 
     @MainActor
+    public func toggleSubtaskCancelled(taskId: Int64, subtaskId: Int64, currentCancelled: Bool) {
+        let newCancelled = !currentCancelled
+        Task {
+            do {
+                _ = try await apiClient.updateSubtask(
+                    taskId: taskId,
+                    subtaskId: subtaskId,
+                    req: UpdateSubtaskRequest(isCancelled: newCancelled)
+                )
+                AppLogger.success(
+                    "Subtask cancelled state toggled", category: .task,
+                    metadata: ["taskId": taskId, "subtaskId": subtaskId, "isCancelled": newCancelled])
+                await loadTasks()
+            } catch {
+                if error.isTaskOrURLCancelled { return }
+                AppLogger.error("Failed to toggle subtask cancelled state", error: error, category: .task)
+                self.errorMessage = L10n.Errors.message(for: error)
+            }
+        }
+    }
+
+    @MainActor
     public func addSubtask(taskId: Int64, title: String, description: String? = nil, dueDate: String? = nil) async -> Bool {
         let trimmed = title.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return false }
@@ -555,6 +577,7 @@ public final class TaskViewModel {
         title: String? = nil,
         description: String? = nil,
         isCompleted: Bool? = nil,
+        isCancelled: Bool? = nil,
         dueDate: String? = nil,
         clearDueDate: Bool = false
     ) async -> Bool {
@@ -566,6 +589,7 @@ public final class TaskViewModel {
                     title: title,
                     description: description,
                     isCompleted: isCompleted,
+                    isCancelled: isCancelled,
                     dueDate: dueDate,
                     clearDueDate: clearDueDate
                 )

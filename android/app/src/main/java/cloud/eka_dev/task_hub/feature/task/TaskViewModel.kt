@@ -358,6 +358,21 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
         }
     }
 
+    fun toggleSubtaskCancelled(taskId: Long, subtaskId: Long, currentCancelled: Boolean) {
+        viewModelScope.launch {
+            try {
+                apiClient.apiService.updateSubtask(
+                    taskId,
+                    subtaskId,
+                    UpdateSubtaskRequest(isCancelled = !currentCancelled)
+                )
+                loadTasks()
+            } catch (e: Exception) {
+                // handle error
+            }
+        }
+    }
+
     fun selectTask(task: Task?) {
         _uiState.value = _uiState.value.copy(selectedTask = task, taskActivities = emptyList())
         if (task != null) {

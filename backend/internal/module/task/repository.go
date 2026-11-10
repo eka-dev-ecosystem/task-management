@@ -26,7 +26,7 @@ type Repository interface {
 	CreateSubtask(ctx context.Context, tx *sqlx.Tx, userID string, taskID int64, req CreateSubtaskRequest) (*SubtaskResponse, error)
 	UpdateSubtask(ctx context.Context, tx *sqlx.Tx, userID string, taskID int64, subtaskID int64, req UpdateSubtaskRequest) (*SubtaskResponse, error)
 	DeleteSubtask(ctx context.Context, tx *sqlx.Tx, userID string, taskID int64, subtaskID int64) error
-	CountSubtasks(ctx context.Context, tx *sqlx.Tx, taskID int64) (int, int, error)
+	CountSubtasks(ctx context.Context, tx *sqlx.Tx, taskID int64) (total int, completed int, cancelled int, err error)
 
 	CreateActivity(ctx context.Context, tx *sqlx.Tx, taskID int64, userID string, activityType string, description string, changes []byte) (*TaskActivityResponse, error)
 	FindActivitiesByTaskID(ctx context.Context, tx *sqlx.Tx, userID string, taskID int64) ([]TaskActivityResponse, error)
@@ -105,15 +105,22 @@ func (e *taskEntity) toResponse(subtasks []SubtaskResponse) TaskResponse {
 	}
 
 	completedCount := 0
+	cancelledCount := 0
 	for _, st := range subtasks {
-		if st.IsCompleted {
+		if st.IsCompleted && !st.IsCancelled {
 			completedCount++
+		}
+		if st.IsCancelled {
+			cancelledCount++
 		}
 	}
 	totalCount := len(subtasks)
+	effectiveTotal := totalCount - cancelledCount
 	percent := 0
-	if totalCount > 0 {
-		percent = (completedCount * 100) / totalCount
+	if effectiveTotal > 0 {
+		percent = (completedCount * 100) / effectiveTotal
+	} else if totalCount > 0 && cancelledCount == totalCount {
+		percent = 100
 	}
 
 	return TaskResponse{
@@ -136,6 +143,7 @@ func (e *taskEntity) toResponse(subtasks []SubtaskResponse) TaskResponse {
 		Subtasks:                  subtasks,
 		SubtasksCount:             totalCount,
 		SubtasksCompleted:         completedCount,
+		SubtasksCancelled:         cancelledCount,
 		ProgressPercent:           percent,
 		IsRecurring:               e.IsRecurring || e.RecurringTaskID != nil,
 		RecurrencePattern:         e.RecurrencePattern,
@@ -197,7 +205,7 @@ func (r *repository) fetchSubtasks(ctx context.Context, tx *sqlx.Tx, taskID int6
 		return nil, errors.New("transaction is required")
 	}
 	query := `
-		SELECT id, task_id, title, COALESCE(description, '') AS description, is_completed, order_index, due_date, created_at, updated_at
+		SELECT id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at
 		FROM subtasks
 		WHERE task_id = $1
 		ORDER BY order_index ASC, id ASC
@@ -266,14 +274,14 @@ func (r *repository) Create(ctx context.Context, tx *sqlx.Tx, userID string, req
 			var valueArgs []interface{}
 			argIdx := 1
 			for i, stTitle := range validTitles {
-				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, '', FALSE, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2))
+				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, '', FALSE, FALSE, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2))
 				valueArgs = append(valueArgs, entity.ID, stTitle, i)
 				argIdx += 3
 			}
 			batchQuery := fmt.Sprintf(`
-				INSERT INTO subtasks (task_id, title, description, is_completed, order_index, created_at, updated_at)
+				INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, order_index, created_at, updated_at)
 				VALUES %s
-				RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, order_index, due_date, created_at, updated_at
+				RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at
 			`, strings.Join(valueStrings, ", "))
 
 			rows, err := tx.QueryxContext(ctx, batchQuery, valueArgs...)
@@ -576,8 +584,8 @@ func (r *repository) Update(ctx context.Context, tx *sqlx.Tx, userID string, id 
 	}
 
 	if entity.Status == "done" {
-		// Automatically mark all subtasks of completed task as completed
-		if _, err := tx.ExecContext(ctx, `UPDATE subtasks SET is_completed = true, updated_at = NOW() WHERE task_id = $1`, entity.ID); err != nil {
+		// Automatically mark all non-cancelled subtasks of completed task as completed
+		if _, err := tx.ExecContext(ctx, `UPDATE subtasks SET is_completed = true, updated_at = NOW() WHERE task_id = $1 AND is_cancelled = false`, entity.ID); err != nil {
 			return nil, fmt.Errorf("failed to complete subtasks: %w", err)
 		}
 	}
@@ -646,7 +654,7 @@ func (r *repository) LogProgress(ctx context.Context, tx *sqlx.Tx, userID string
 	}
 
 	if entity.Status == "done" {
-		if _, err := tx.ExecContext(ctx, `UPDATE subtasks SET is_completed = true, updated_at = NOW() WHERE task_id = $1`, entity.ID); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE subtasks SET is_completed = true, updated_at = NOW() WHERE task_id = $1 AND is_cancelled = false`, entity.ID); err != nil {
 			return nil, fmt.Errorf("failed to complete subtasks: %w", err)
 		}
 	}
@@ -695,9 +703,9 @@ func (r *repository) CreateSubtask(ctx context.Context, tx *sqlx.Tx, userID stri
 	}
 
 	query := `
-		INSERT INTO subtasks (task_id, title, description, is_completed, order_index, due_date, created_at, updated_at)
-		VALUES ($1, $2, $3, FALSE, (SELECT COALESCE(MAX(order_index) + 1, 0) FROM subtasks WHERE task_id = $1), $4, NOW(), NOW())
-		RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, order_index, due_date, created_at, updated_at
+		INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at)
+		VALUES ($1, $2, $3, FALSE, FALSE, (SELECT COALESCE(MAX(order_index) + 1, 0) FROM subtasks WHERE task_id = $1), $4, NOW(), NOW())
+		RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at
 	`
 	var st SubtaskResponse
 	err = tx.QueryRowxContext(ctx, query, taskID, req.Title, req.Description, req.DueDate).StructScan(&st)
@@ -718,7 +726,7 @@ func (r *repository) UpdateSubtask(ctx context.Context, tx *sqlx.Tx, userID stri
 	}
 
 	var existing SubtaskResponse
-	err = tx.GetContext(ctx, &existing, `SELECT id, task_id, title, COALESCE(description, '') AS description, is_completed, order_index, due_date, created_at, updated_at FROM subtasks WHERE id = $1 AND task_id = $2`, subtaskID, taskID)
+	err = tx.GetContext(ctx, &existing, `SELECT id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at FROM subtasks WHERE id = $1 AND task_id = $2`, subtaskID, taskID)
 	if err != nil {
 		return nil, fmt.Errorf("subtask not found: %w", err)
 	}
@@ -740,8 +748,18 @@ func (r *repository) UpdateSubtask(ctx context.Context, tx *sqlx.Tx, userID stri
 		description = *req.Description
 	}
 	isCompleted := existing.IsCompleted
+	isCancelled := existing.IsCancelled
+	if req.IsCancelled != nil {
+		isCancelled = *req.IsCancelled
+		if isCancelled {
+			isCompleted = false
+		}
+	}
 	if req.IsCompleted != nil {
 		isCompleted = *req.IsCompleted
+		if isCompleted {
+			isCancelled = false
+		}
 	}
 	dueDate := existing.DueDate
 	if req.ClearDueDate {
@@ -754,12 +772,12 @@ func (r *repository) UpdateSubtask(ctx context.Context, tx *sqlx.Tx, userID stri
 
 	query := `
 		UPDATE subtasks
-		SET title = $1, description = $2, is_completed = $3, due_date = $4, updated_at = NOW()
-		WHERE id = $5 AND task_id = $6
-		RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, order_index, due_date, created_at, updated_at
+		SET title = $1, description = $2, is_completed = $3, is_cancelled = $4, due_date = $5, updated_at = NOW()
+		WHERE id = $6 AND task_id = $7
+		RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at
 	`
 	var updated SubtaskResponse
-	err = tx.QueryRowxContext(ctx, query, title, description, isCompleted, dueDate, subtaskID, taskID).StructScan(&updated)
+	err = tx.QueryRowxContext(ctx, query, title, description, isCompleted, isCancelled, dueDate, subtaskID, taskID).StructScan(&updated)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update subtask: %w", err)
 	}
@@ -783,20 +801,24 @@ func (r *repository) DeleteSubtask(ctx context.Context, tx *sqlx.Tx, userID stri
 	return nil
 }
 
-func (r *repository) CountSubtasks(ctx context.Context, tx *sqlx.Tx, taskID int64) (int, int, error) {
+func (r *repository) CountSubtasks(ctx context.Context, tx *sqlx.Tx, taskID int64) (int, int, int, error) {
 	if tx == nil {
-		return 0, 0, errors.New("transaction is required")
+		return 0, 0, 0, errors.New("transaction is required")
 	}
 	type sc struct {
 		Total     int `db:"total"`
 		Completed int `db:"completed"`
+		Cancelled int `db:"cancelled"`
 	}
 	var res sc
 	err := tx.GetContext(ctx, &res, `
-		SELECT COUNT(*) as total, COALESCE(COUNT(*) FILTER (WHERE is_completed = true), 0) as completed
+		SELECT 
+			COUNT(*) as total, 
+			COALESCE(COUNT(*) FILTER (WHERE is_completed = true AND is_cancelled = false), 0) as completed,
+			COALESCE(COUNT(*) FILTER (WHERE is_cancelled = true), 0) as cancelled
 		FROM subtasks WHERE task_id = $1
 	`, taskID)
-	return res.Total, res.Completed, err
+	return res.Total, res.Completed, res.Cancelled, err
 }
 
 func (r *repository) FindByIDSystem(ctx context.Context, tx *sqlx.Tx, id int64) (*TaskResponse, string, string, int, bool, error) {
@@ -1589,12 +1611,12 @@ func (r *repository) CreateInstanceFromRecurring(ctx context.Context, tx *sqlx.T
 			var valueArgs []interface{}
 			argIdx := 1
 			for _, st := range validItems {
-				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, FALSE, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3))
+				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, FALSE, FALSE, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3))
 				valueArgs = append(valueArgs, entity.ID, st.Title, st.Description, st.OrderIndex)
 				argIdx += 4
 			}
 			batchQuery := fmt.Sprintf(`
-				INSERT INTO subtasks (task_id, title, description, is_completed, order_index, created_at, updated_at)
+				INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, order_index, created_at, updated_at)
 				VALUES %s
 			`, strings.Join(valueStrings, ", "))
 			if _, err := tx.ExecContext(ctx, batchQuery, valueArgs...); err != nil {

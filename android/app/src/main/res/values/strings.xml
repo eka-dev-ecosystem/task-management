@@ -75,6 +75,9 @@
     <string name="add_subtask_placeholder">Add checklist subtask…</string>
     <string name="add_subtask">Add Subtask</string>
     <string name="delete_subtask">Delete Subtask</string>
+    <string name="subtask_skipped">Skipped</string>
+    <string name="skip_subtask">Skip Subtask</string>
+    <string name="unskip_subtask">Reactivate Subtask</string>
     <string name="tab_details_subtasks">Details &amp; Subtasks</string>
     <string name="tab_activity_logs">Activity Logs</string>
     <string name="activity_logs_title">Activity History</string>

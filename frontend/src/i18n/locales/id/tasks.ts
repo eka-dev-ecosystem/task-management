@@ -113,6 +113,9 @@ export const taskDrawer = {
   subtaskCollapseTooltip: 'Tutup detail subtask',
   subtaskSaveTooltip: 'Simpan perubahan subtask',
   subtaskCancelTooltip: 'Batalkan perubahan',
+  subtaskSkipped: 'Dilewati',
+  skipSubtask: 'Lewati Subtugas',
+  unskipSubtask: 'Aktifkan Kembali',
   deleteTaskConfirmHeader: 'Hapus Tugas',
   deleteTaskConfirmMessage:
     'Apakah Anda yakin ingin menghapus tugas ini? Tindakan ini tidak dapat dibatalkan.',

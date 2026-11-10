@@ -593,8 +593,8 @@ public actor APIClient {
         let _: EmptyResponse = try await request(endpoint: "tasks/\(id)", method: "DELETE")
     }
 
-    public func updateSubtask(taskId: Int64, subtaskId: Int64, isCompleted: Bool) async throws -> Subtask {
-        let body = try encoder.encode(UpdateSubtaskRequest(title: nil, isCompleted: isCompleted))
+    public func updateSubtask(taskId: Int64, subtaskId: Int64, isCompleted: Bool? = nil, isCancelled: Bool? = nil) async throws -> Subtask {
+        let body = try encoder.encode(UpdateSubtaskRequest(title: nil, isCompleted: isCompleted, isCancelled: isCancelled))
         return try await request(endpoint: "tasks/\(taskId)/subtasks/\(subtaskId)", method: "PUT", body: body)
     }
 

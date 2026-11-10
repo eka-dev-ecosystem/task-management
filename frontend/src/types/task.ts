@@ -70,6 +70,7 @@ export interface Subtask {
   title: string
   description?: string
   is_completed: boolean
+  is_cancelled?: boolean
   order_index: number
   due_date?: string | null
   created_at: string
@@ -98,6 +99,7 @@ export interface Task {
   subtasks: Subtask[]
   subtasks_count: number
   subtasks_completed: number
+  subtasks_cancelled?: number
   progress_percent: number
   is_recurring?: boolean
   recurrence_pattern?: RecurrencePattern | null
