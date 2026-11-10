@@ -6,11 +6,13 @@ package app
 import (
 	"context"
 	"log/slog"
+	"os"
 	"time"
 
 	"golang/cache"
 	"golang/config"
 	"golang/database"
+	"golang/database/migrate"
 	"golang/internal/module/reminder"
 	"golang/pkg/auth"
 	"golang/pkg/logging"
@@ -100,6 +102,16 @@ func Boot() (*Container, func() error) {
 	closers = append(closers, func() error { return db.Close() })
 	container.DB = db
 	logger.Info("postgres initialized")
+
+	// Auto-run database migrations if migrations directory exists
+	if _, statErr := os.Stat("./migrations"); statErr == nil {
+		logger.Info("running database migrations", slog.String("path", "./migrations"))
+		if migErr := migrate.RunMigrations(&cfg.Database, "./migrations"); migErr != nil {
+			logger.Warn("failed to run database migrations on boot", logging.Err(migErr))
+		} else {
+			logger.Info("database migrations completed successfully")
+		}
+	}
 
 	// Redis turns on JWT revocation tracking and distributed realtime
 	// pub/sub. When disabled, those features degrade gracefully.

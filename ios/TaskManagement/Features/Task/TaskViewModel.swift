@@ -505,11 +505,36 @@ public final class TaskViewModel {
 
     @MainActor
     public func toggleSubtask(taskId: Int64, subtaskId: Int64, currentCompleted: Bool) {
+        let newCompleted = !currentCompleted
+
+        // Optimistic local update on tasks array for 0ms lag
+        if let idx = tasks.firstIndex(where: { $0.id == taskId }), var subtasks = tasks[idx].subtasks {
+            if let stIdx = subtasks.firstIndex(where: { $0.id == subtaskId }) {
+                subtasks[stIdx].isCompleted = newCompleted
+                if newCompleted {
+                    subtasks[stIdx].isCancelled = false
+                }
+                tasks[idx].subtasks = subtasks
+                let completedCount = subtasks.filter { $0.isCompleted && !$0.isCancelled }.count
+                let cancelledCount = subtasks.filter { $0.isCancelled }.count
+                let effectiveTotal = subtasks.count - cancelledCount
+                tasks[idx].subtasksCompleted = completedCount
+                tasks[idx].subtasksCancelled = cancelledCount
+                tasks[idx].progressPercent = effectiveTotal <= 0 ? (subtasks.isEmpty ? 0 : 100) : Int(Double(completedCount) / Double(effectiveTotal) * 100)
+                if completedCount + cancelledCount == subtasks.count && subtasks.count > 0 {
+                    tasks[idx].status = "done"
+                    tasks[idx].isFocus = false
+                } else if !newCompleted && tasks[idx].status == "done" {
+                    tasks[idx].status = "in_progress"
+                }
+            }
+        }
+
         // Immediate local mutation for offline widget and instant response
         SharedWidgetDataManager.shared.toggleSubtaskLocally(
             taskId: taskId,
             subtaskId: subtaskId,
-            isCompleted: !currentCompleted
+            isCompleted: newCompleted
         )
 
         Task {
@@ -517,7 +542,7 @@ public final class TaskViewModel {
                 _ = try await apiClient.updateSubtask(
                     taskId: taskId,
                     subtaskId: subtaskId,
-                    isCompleted: !currentCompleted
+                    isCompleted: newCompleted
                 )
                 AppLogger.success(
                     "Subtask completion toggled", category: .task,
@@ -534,6 +559,30 @@ public final class TaskViewModel {
     @MainActor
     public func toggleSubtaskCancelled(taskId: Int64, subtaskId: Int64, currentCancelled: Bool) {
         let newCancelled = !currentCancelled
+
+        // Optimistic local update on tasks array for 0ms lag
+        if let idx = tasks.firstIndex(where: { $0.id == taskId }), var subtasks = tasks[idx].subtasks {
+            if let stIdx = subtasks.firstIndex(where: { $0.id == subtaskId }) {
+                subtasks[stIdx].isCancelled = newCancelled
+                if newCancelled {
+                    subtasks[stIdx].isCompleted = false
+                }
+                tasks[idx].subtasks = subtasks
+                let completedCount = subtasks.filter { $0.isCompleted && !$0.isCancelled }.count
+                let cancelledCount = subtasks.filter { $0.isCancelled }.count
+                let effectiveTotal = subtasks.count - cancelledCount
+                tasks[idx].subtasksCompleted = completedCount
+                tasks[idx].subtasksCancelled = cancelledCount
+                tasks[idx].progressPercent = effectiveTotal <= 0 ? (subtasks.isEmpty ? 0 : 100) : Int(Double(completedCount) / Double(effectiveTotal) * 100)
+                if completedCount + cancelledCount == subtasks.count && subtasks.count > 0 {
+                    tasks[idx].status = "done"
+                    tasks[idx].isFocus = false
+                } else if tasks[idx].status == "done" {
+                    tasks[idx].status = "in_progress"
+                }
+            }
+        }
+
         Task {
             do {
                 _ = try await apiClient.updateSubtask(

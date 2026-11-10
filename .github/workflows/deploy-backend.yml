@@ -58,7 +58,7 @@ jobs:
     needs: test
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     concurrency:
-      group: release-pipeline-${{ github.repository }}
+      group: release-pipeline-backend-${{ github.repository }}
       cancel-in-progress: false
     uses: exa31/github-workflows/.github/workflows/backend.yml@v1.0.0
     with:
