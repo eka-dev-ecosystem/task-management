@@ -3,3 +3,4 @@ ALTER TABLE subtasks ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN NOT NULL DEFA
 
 -- Index for queries filtering active vs cancelled subtasks
 CREATE INDEX IF NOT EXISTS idx_subtasks_task_cancelled ON subtasks(task_id, is_cancelled);
+
