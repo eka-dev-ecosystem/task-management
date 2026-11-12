@@ -64,6 +64,7 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
     private let lastSyncKey = "task_hub_widget_last_sync"
     private let authTokenKey = "task_hub_shared_auth_token"
     private let refreshTokenKey = "task_hub_shared_refresh_token"
+    private let recentlyCompletedTasksKey = "task_hub_recently_completed_tasks"
 
     private let defaults: UserDefaults
     private let lock = NSLock()
@@ -423,6 +424,46 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
 
     // MARK: - Task Status Updates Directly from Widget
 
+    public func getRecentlyCompletedTask() -> TaskItem? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let data = defaults.data(forKey: recentlyCompletedTasksKey),
+              let list = try? JSONDecoder().decode([TaskItem].self, from: data) else {
+            return nil
+        }
+        return list.first
+    }
+
+    private func saveRecentlyCompletedTaskLocked(_ task: TaskItem) {
+        var list: [TaskItem] = []
+        if let data = defaults.data(forKey: recentlyCompletedTasksKey),
+           let existing = try? JSONDecoder().decode([TaskItem].self, from: data) {
+            list = existing.filter { $0.id != task.id }
+        }
+        list.insert(task, at: 0)
+        if list.count > 5 {
+            list = Array(list.prefix(5))
+        }
+        if let encoded = try? JSONEncoder().encode(list) {
+            defaults.set(encoded, forKey: recentlyCompletedTasksKey)
+        }
+    }
+
+    private func removeRecentlyCompletedTaskLocked(taskId: Int64) -> TaskItem? {
+        guard let data = defaults.data(forKey: recentlyCompletedTasksKey),
+              var list = try? JSONDecoder().decode([TaskItem].self, from: data) else {
+            return nil
+        }
+        if let idx = list.firstIndex(where: { $0.id == taskId }) {
+            let item = list.remove(at: idx)
+            if let encoded = try? JSONEncoder().encode(list) {
+                defaults.set(encoded, forKey: recentlyCompletedTasksKey)
+            }
+            return item
+        }
+        return nil
+    }
+
     public func updateTaskStatusLocally(taskId: Int64, status: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -441,9 +482,14 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
             }
 
             var updatedFocus: [TaskItem] = []
+            var foundInFocus = false
             for var t in bundle.focusTasks {
                 if t.id == taskId {
+                    foundInFocus = true
                     t.status = status
+                    if isNowDone {
+                        saveRecentlyCompletedTaskLocked(t)
+                    }
                 }
                 if t.status != "done" {
                     updatedFocus.append(t)
@@ -451,12 +497,28 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
             }
 
             var updatedDeadlines: [TaskItem] = []
+            var foundInDeadlines = false
             for var t in bundle.upcomingDeadlines {
                 if t.id == taskId {
+                    foundInDeadlines = true
                     t.status = status
+                    if isNowDone {
+                        saveRecentlyCompletedTaskLocked(t)
+                    }
                 }
                 if t.status != "done" {
                     updatedDeadlines.append(t)
+                }
+            }
+
+            // If task was reopened/downgraded and was not in active focus, restore from recently completed
+            if !isNowDone && !foundInFocus {
+                if var restored = removeRecentlyCompletedTaskLocked(taskId: taskId) {
+                    restored.status = status
+                    updatedFocus.insert(restored, at: 0)
+                    if let due = restored.dueDate, !due.isEmpty && !foundInDeadlines {
+                        updatedDeadlines.append(restored)
+                    }
                 }
             }
 
@@ -480,6 +542,12 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
                 if cus.remove(taskId) != nil {
                     defaults.set(Array(cus), forKey: selectedCustomTaskIdsKey)
                 }
+                var excl = Set(defaults.array(forKey: excludedTaskIdsKey) as? [Int64] ?? [])
+                if excl.remove(taskId) != nil {
+                    defaults.set(Array(excl), forKey: excludedTaskIdsKey)
+                }
+            } else {
+                // Ensure downgraded task is unexcluded so it appears on widget
                 var excl = Set(defaults.array(forKey: excludedTaskIdsKey) as? [Int64] ?? [])
                 if excl.remove(taskId) != nil {
                     defaults.set(Array(excl), forKey: excludedTaskIdsKey)

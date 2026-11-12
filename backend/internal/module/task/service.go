@@ -221,6 +221,19 @@ func (s *service) Create(ctx context.Context, userID string, req CreateTaskReque
 		return nil, err
 	}
 
+	if res != nil {
+		if s.hub != nil {
+			s.hub.Broadcast(&realtime.Message{
+				Type:   "task:created",
+				UserID: userID,
+				Data: map[string]any{
+					"task_id": res.ID,
+				},
+			})
+		}
+		s.broadcastWidgetSyncPush(userID, res.ID, "task:created")
+	}
+
 	return res, nil
 }
 
@@ -432,6 +445,17 @@ func (s *service) Update(ctx context.Context, userID string, id int64, req Updat
 	}
 
 	if res != nil {
+		if s.hub != nil {
+			s.hub.Broadcast(&realtime.Message{
+				Type:   "task:updated",
+				UserID: userID,
+				Data: map[string]any{
+					"task_id": res.ID,
+				},
+			})
+		}
+		s.broadcastWidgetSyncPush(userID, res.ID, "task:updated")
+
 		if dueChanged || urgentChanged {
 			s.notifyTaskDeadlineChanged(res.ID, res.Title, res.DueDate, urgentChanged, dueRemoved, userID)
 		}
@@ -493,6 +517,17 @@ func (s *service) Delete(ctx context.Context, userID string, id int64) error {
 		return err
 	}
 
+	if s.hub != nil {
+		s.hub.Broadcast(&realtime.Message{
+			Type:   "task:deleted",
+			UserID: userID,
+			Data: map[string]any{
+				"task_id": id,
+			},
+		})
+	}
+	s.broadcastWidgetSyncPush(userID, id, "task:deleted")
+
 	if deletedEntity != nil && deletedEntity.DueDate != nil {
 		s.notifyTaskDeadlineChanged(id, deletedEntity.Title, nil, false, true, userID)
 	}
@@ -550,6 +585,7 @@ func (s *service) LogProgress(ctx context.Context, userID string, id int64, req 
 			},
 		})
 	}
+	s.broadcastWidgetSyncPush(userID, id, "task:activity_created")
 	return res, nil
 }
 
@@ -580,6 +616,18 @@ func (s *service) ToggleFocus(ctx context.Context, userID string, id int64) (*Ta
 		}
 		return nil
 	})
+	if err == nil && res != nil {
+		if s.hub != nil {
+			s.hub.Broadcast(&realtime.Message{
+				Type:   "task:updated",
+				UserID: userID,
+				Data: map[string]any{
+					"task_id": id,
+				},
+			})
+		}
+		s.broadcastWidgetSyncPush(userID, id, "task:updated")
+	}
 	return res, err
 }
 
@@ -623,14 +671,17 @@ func (s *service) CreateSubtask(ctx context.Context, userID string, taskID int64
 		}
 		return nil
 	})
-	if err == nil && s.hub != nil {
-		s.hub.Broadcast(&realtime.Message{
-			Type:   "task:activity_created",
-			UserID: userID,
-			Data: map[string]any{
-				"task_id": taskID,
-			},
-		})
+	if err == nil {
+		if s.hub != nil {
+			s.hub.Broadcast(&realtime.Message{
+				Type:   "task:activity_created",
+				UserID: userID,
+				Data: map[string]any{
+					"task_id": taskID,
+				},
+			})
+		}
+		s.broadcastWidgetSyncPush(userID, taskID, "task:updated")
 	}
 	return res, err
 }
@@ -734,14 +785,17 @@ func (s *service) UpdateSubtask(ctx context.Context, userID string, taskID int64
 		}
 		return nil
 	})
-	if err == nil && s.hub != nil {
-		s.hub.Broadcast(&realtime.Message{
-			Type:   "task:activity_created",
-			UserID: userID,
-			Data: map[string]any{
-				"task_id": taskID,
-			},
-		})
+	if err == nil {
+		if s.hub != nil {
+			s.hub.Broadcast(&realtime.Message{
+				Type:   "task:activity_created",
+				UserID: userID,
+				Data: map[string]any{
+					"task_id": taskID,
+				},
+			})
+		}
+		s.broadcastWidgetSyncPush(userID, taskID, "task:updated")
 	}
 	return res, err
 }
@@ -782,14 +836,17 @@ func (s *service) DeleteSubtask(ctx context.Context, userID string, taskID int64
 		}
 		return nil
 	})
-	if err == nil && s.hub != nil {
-		s.hub.Broadcast(&realtime.Message{
-			Type:   "task:activity_created",
-			UserID: userID,
-			Data: map[string]any{
-				"task_id": taskID,
-			},
-		})
+	if err == nil {
+		if s.hub != nil {
+			s.hub.Broadcast(&realtime.Message{
+				Type:   "task:activity_created",
+				UserID: userID,
+				Data: map[string]any{
+					"task_id": taskID,
+				},
+			})
+		}
+		s.broadcastWidgetSyncPush(userID, taskID, "task:updated")
 	}
 	return err
 }
@@ -1178,6 +1235,9 @@ func (s *service) ProcessTaskRecurrence(ctx context.Context, targetID int64) err
 			},
 		})
 	}
+	if created != nil {
+		s.broadcastWidgetSyncPush(master.UserID, created.ID, "task:created")
+	}
 
 	if s.logger != nil {
 		s.logger.Info("recurring task processed successfully", "recurring_id", master.ID, "task_id", created.ID)
@@ -1547,6 +1607,34 @@ func (s *service) notifyTaskDeadlineChanged(taskID int64, title string, dueDate 
 		}
 		if res, err := s.pushSender.SendPushNotificationWithResult(bgCtx, tokens, "Pembaruan Batas Waktu", body, pushData); err != nil && s.logger != nil {
 			s.logger.WarnContext(bgCtx, "failed to dispatch task deadline push notification", "task_id", taskID, "error", err)
+		} else if res != nil && len(res.InvalidTokens) > 0 {
+			_ = s.reminderRepo.DeleteDeviceTokens(bgCtx, res.InvalidTokens)
+		}
+	}()
+}
+
+func (s *service) broadcastWidgetSyncPush(userID string, taskID int64, eventType string) {
+	if s.pushSender == nil || s.reminderRepo == nil || userID == "" {
+		return
+	}
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		tokens, err := s.reminderRepo.GetUserDeviceTokens(bgCtx, userID)
+		if err != nil || len(tokens) == 0 {
+			return
+		}
+
+		pushData := map[string]string{
+			"type":      "widget:sync",
+			"event":     eventType,
+			"task_id":   fmt.Sprintf("%d", taskID),
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		}
+
+		if res, err := s.pushSender.SendPushNotificationWithResult(bgCtx, tokens, "", "", pushData); err != nil && s.logger != nil {
+			s.logger.WarnContext(bgCtx, "failed to dispatch widget sync silent push", "task_id", taskID, "error", err)
 		} else if res != nil && len(res.InvalidTokens) > 0 {
 			_ = s.reminderRepo.DeleteDeviceTokens(bgCtx, res.InvalidTokens)
 		}

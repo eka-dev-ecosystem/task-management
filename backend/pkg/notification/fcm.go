@@ -107,47 +107,71 @@ func (s *FCMPushSender) SendPushNotificationWithResult(ctx context.Context, toke
 		return &PushResult{SuccessCount: 0, FailureCount: 0, TotalTokens: 0}, nil
 	}
 
-	apnsCategory := ""
-	apnsSound := "default"
-	if cat, ok := data["category"]; ok && cat != "" {
-		apnsCategory = cat
-	} else if _, ok := data["reminder_id"]; ok {
-		apnsCategory = "ALARM_REMINDER"
-	}
+	isSilent := (title == "" && body == "")
 
-	if snd, ok := data["sound"]; ok && snd != "" {
-		apnsSound = snd
-	} else if apnsCategory == "ALARM_REMINDER" {
-		apnsSound = "classic_alarm.aiff"
+	var notificationPayload *messaging.Notification
+	var apnsHeaders map[string]string
+	var apnsAps *messaging.Aps
+	var androidNotification *messaging.AndroidNotification
+
+	if isSilent {
+		apnsHeaders = map[string]string{
+			"apns-priority":  "5",
+			"apns-push-type": "background",
+		}
+		apnsAps = &messaging.Aps{
+			ContentAvailable: true,
+		}
+		androidNotification = nil
+	} else {
+		notificationPayload = &messaging.Notification{
+			Title: title,
+			Body:  body,
+		}
+
+		apnsCategory := ""
+		apnsSound := "default"
+		if cat, ok := data["category"]; ok && cat != "" {
+			apnsCategory = cat
+		} else if _, ok := data["reminder_id"]; ok {
+			apnsCategory = "ALARM_REMINDER"
+		}
+
+		if snd, ok := data["sound"]; ok && snd != "" {
+			apnsSound = snd
+		} else if apnsCategory == "ALARM_REMINDER" {
+			apnsSound = "classic_alarm.aiff"
+		}
+
+		apnsHeaders = map[string]string{
+			"apns-priority": "10",
+		}
+		apnsAps = &messaging.Aps{
+			Sound:            apnsSound,
+			Category:         apnsCategory,
+			ContentAvailable: true,
+		}
+		androidNotification = &messaging.AndroidNotification{
+			ChannelID:             "task_hub_alarms",
+			Sound:                 "default",
+			Priority:              messaging.PriorityHigh,
+			DefaultVibrateTimings: true,
+		}
 	}
 
 	msg := &messaging.MulticastMessage{
-		Tokens: tokens,
-		Notification: &messaging.Notification{
-			Title: title,
-			Body:  body,
-		},
-		Data: data,
+		Tokens:       tokens,
+		Notification: notificationPayload,
+		Data:         data,
 		APNS: &messaging.APNSConfig{
-			Headers: map[string]string{
-				"apns-priority": "10",
-			},
+			Headers: apnsHeaders,
 			Payload: &messaging.APNSPayload{
-				Aps: &messaging.Aps{
-					Sound:            apnsSound,
-					Category:         apnsCategory,
-					ContentAvailable: true,
-				},
+				Aps: apnsAps,
 			},
 		},
 		Android: &messaging.AndroidConfig{
-			Priority: "high",
-			Notification: &messaging.AndroidNotification{
-				ChannelID:             "task_hub_alarms",
-				Sound:                 "default",
-				Priority:              messaging.PriorityHigh,
-				DefaultVibrateTimings: true,
-			},
+			Priority:     "high",
+			Notification: androidNotification,
 		},
 	}
 

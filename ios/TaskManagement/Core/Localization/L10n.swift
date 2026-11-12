@@ -510,6 +510,11 @@ public enum L10n {
         public static var recurringActionDone: String { "widget.recurring.actionDone".localized }
         public static var recurringActionReview: String { "widget.recurring.actionReview".localized }
         public static var recurringActionDoneShort: String { "widget.recurring.actionDoneShort".localized }
+        public static var recurringActionInProgress: String { "widget.recurring.actionInProgress".localized }
+        public static var recurringActionRevert: String { "widget.recurring.actionRevert".localized }
+        public static var recurringActionReopen: String { "widget.recurring.actionReopen".localized }
+        public static var recurringActionStart: String { "widget.recurring.actionStart".localized }
+        public static var recurringActionTodo: String { "widget.recurring.actionTodo".localized }
         public static var recurringDoneTitle: String { "widget.recurring.doneTitle".localized }
         public static var recurringDoneDesc: String { "widget.recurring.doneDesc".localized }
         public static var recurringEmptyTitle: String { "widget.recurring.emptyTitle".localized }

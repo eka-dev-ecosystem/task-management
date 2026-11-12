@@ -124,6 +124,52 @@ public struct UpdateTaskStatusIntent: AppIntent {
     }
 }
 
+public struct DowngradeTaskStatusIntent: AppIntent {
+    public static var title: LocalizedStringResource = "Downgrade Task Status"
+    public static var description = IntentDescription("Downgrades the task status (e.g. review to in_progress, in_progress to todo).")
+
+    @Parameter(title: "Task ID")
+    public var taskId: Int
+
+    @Parameter(title: "Current Status")
+    public var currentStatus: String
+
+    public init() {
+        self.taskId = 0
+        self.currentStatus = "in_progress"
+    }
+
+    public init(taskId: Int64, currentStatus: String) {
+        self.taskId = Int(taskId)
+        self.currentStatus = currentStatus
+    }
+
+    public func perform() async throws -> some IntentResult {
+        let newStatus: String
+        switch currentStatus.lowercased() {
+        case "done", "review", "in_review":
+            newStatus = "in_progress"
+        case "in_progress":
+            newStatus = "todo"
+        default:
+            newStatus = "todo"
+        }
+
+        SharedWidgetDataManager.shared.updateTaskStatusLocally(
+            taskId: Int64(taskId),
+            status: newStatus
+        )
+
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
+
+        await SharedWidgetDataManager.shared.syncWithBackend()
+
+        return .result()
+    }
+}
+
 public struct CycleNextTaskIntent: AppIntent {
     public static var title: LocalizedStringResource = "Next Task"
     public static var description = IntentDescription("Switch to another active task on the widget.")

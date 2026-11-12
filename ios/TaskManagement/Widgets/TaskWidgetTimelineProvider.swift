@@ -116,13 +116,26 @@ public struct TaskWidgetTimelineProvider: TimelineProvider {
     }
 
     public func getTimeline(in context: Context, completion: @escaping (Timeline<TaskWidgetEntry>) -> Void) {
-        let bundle = SharedWidgetDataManager.shared.loadWidgetBundle() ?? TaskWidgetEntry.empty.bundle
-        let entry = TaskWidgetEntry(date: Date(), bundle: bundle, isOffline: false)
-
-        // Reload timeline every 15 minutes
+        let cached = SharedWidgetDataManager.shared.loadWidgetBundle() ?? TaskWidgetEntry.empty.bundle
+        let currentEntry = TaskWidgetEntry(date: Date(), bundle: cached, isOffline: false)
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date()) ?? Date().addingTimeInterval(900)
-        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-        completion(timeline)
+
+        // If no auth token, deliver cached immediately
+        guard SharedWidgetDataManager.shared.getAuthToken() != nil else {
+            completion(Timeline(entries: [currentEntry], policy: .after(nextUpdate)))
+            return
+        }
+
+        Task {
+            do {
+                let freshBundle = try await APIClient.shared.getWidgetBundle()
+                SharedWidgetDataManager.shared.saveWidgetBundle(freshBundle)
+                let freshEntry = TaskWidgetEntry(date: Date(), bundle: freshBundle, isOffline: false)
+                completion(Timeline(entries: [freshEntry], policy: .after(nextUpdate)))
+            } catch {
+                completion(Timeline(entries: [currentEntry], policy: .after(nextUpdate)))
+            }
+        }
     }
 }
 #endif

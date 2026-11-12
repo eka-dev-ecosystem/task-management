@@ -227,7 +227,7 @@ public struct RecurringTaskWidgetView: View {
                     let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
 
                     if allChecked {
-                        smallActionsBar(taskId: task.id)
+                        smallActionsBar(taskId: task.id, currentStatus: task.status)
                     } else if p.subtasks.isEmpty {
                         Text(L10n.Widgets.recurringNoSubtasks)
                             .font(.system(size: 10))
@@ -334,6 +334,8 @@ public struct RecurringTaskWidgetView: View {
 
                         Spacer()
 
+                        statusTransitionPill(task: task)
+
                         if let pattern = task.recurrencePattern {
                             Text(formatPattern(pattern))
                                 .font(.system(size: 9, weight: .semibold))
@@ -351,7 +353,7 @@ public struct RecurringTaskWidgetView: View {
                     let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
 
                     if allChecked {
-                        statusActionBar(taskId: task.id)
+                        statusActionBar(taskId: task.id, currentStatus: task.status)
                     } else if p.subtasks.isEmpty {
                         Text(L10n.Widgets.recurringNoSubtasks)
                             .font(.system(size: 11))
@@ -435,10 +437,16 @@ public struct RecurringTaskWidgetView: View {
                 if task.status == "done" {
                     doneStateView(isCompact: false)
                 } else {
-                    Text(task.title)
-                        .font(.system(size: 15, weight: .bold))
-                        .lineLimit(1)
-                        .foregroundStyle(.white)
+                    HStack(alignment: .center) {
+                        Text(task.title)
+                            .font(.system(size: 15, weight: .bold))
+                            .lineLimit(1)
+                            .foregroundStyle(.white)
+
+                        Spacer()
+
+                        statusTransitionPill(task: task)
+                    }
 
                     progressBar(for: task)
 
@@ -456,7 +464,7 @@ public struct RecurringTaskWidgetView: View {
                     }
 
                     if allChecked {
-                        statusActionBar(taskId: task.id)
+                        statusActionBar(taskId: task.id, currentStatus: task.status)
                     }
                 }
             } else {
@@ -567,7 +575,74 @@ public struct RecurringTaskWidgetView: View {
     }
 
     @ViewBuilder
-    private func statusActionBar(taskId: Int64) -> some View {
+    private func statusTransitionPill(task: TaskItem) -> some View {
+        let status = task.status.lowercased()
+        switch status {
+        case "todo", "backlog":
+            Button(intent: UpdateTaskStatusIntent(taskId: task.id, newStatus: "in_progress")) {
+                HStack(spacing: 3) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 7, weight: .bold))
+                    Text(L10n.Widgets.recurringActionStart)
+                        .font(.system(size: 8, weight: .bold))
+                }
+                .foregroundStyle(Color(red: 56/255, green: 189/255, blue: 248/255))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.18))
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+
+        case "in_progress":
+            HStack(spacing: 3) {
+                Button(intent: DowngradeTaskStatusIntent(taskId: task.id, currentStatus: "in_progress")) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .padding(3)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+
+                Text(L10n.Widgets.recurringActionInProgress)
+                    .font(.system(size: 8, weight: .black))
+                    .foregroundStyle(Color(red: 251/255, green: 191/255, blue: 36/255))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color(red: 251/255, green: 191/255, blue: 36/255).opacity(0.15))
+                    .clipShape(Capsule())
+            }
+
+        case "in_review", "review":
+            HStack(spacing: 3) {
+                Button(intent: DowngradeTaskStatusIntent(taskId: task.id, currentStatus: "in_review")) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .padding(3)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+
+                Text(L10n.Widgets.recurringActionReview)
+                    .font(.system(size: 8, weight: .black))
+                    .foregroundStyle(Color(red: 168/255, green: 85/255, blue: 247/255))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.15))
+                    .clipShape(Capsule())
+            }
+
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func statusActionBar(taskId: Int64, currentStatus: String = "in_progress") -> some View {
         VStack(spacing: 6) {
             HStack(spacing: 4) {
                 Image(systemName: "sparkles")
@@ -577,7 +652,7 @@ public struct RecurringTaskWidgetView: View {
             }
             .foregroundStyle(Color(red: 52/255, green: 211/255, blue: 153/255))
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Button(intent: UpdateTaskStatusIntent(taskId: taskId, newStatus: "done")) {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
@@ -613,6 +688,21 @@ public struct RecurringTaskWidgetView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .buttonStyle(.plain)
+
+                Button(intent: DowngradeTaskStatusIntent(taskId: taskId, currentStatus: currentStatus)) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.system(size: 9, weight: .bold))
+                        Text(L10n.Widgets.recurringActionRevert)
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.08))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(8)
@@ -621,21 +711,33 @@ public struct RecurringTaskWidgetView: View {
     }
 
     @ViewBuilder
-    private func smallActionsBar(taskId: Int64) -> some View {
-        Button(intent: UpdateTaskStatusIntent(taskId: taskId, newStatus: "done")) {
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 10, weight: .bold))
-                Text(L10n.Widgets.recurringActionDoneShort)
-                    .font(.system(size: 10, weight: .bold))
+    private func smallActionsBar(taskId: Int64, currentStatus: String = "in_progress") -> some View {
+        HStack(spacing: 4) {
+            Button(intent: UpdateTaskStatusIntent(taskId: taskId, newStatus: "done")) {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10, weight: .bold))
+                    Text(L10n.Widgets.recurringActionDoneShort)
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+                .background(Color(red: 16/255, green: 185/255, blue: 129/255))
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
-            .background(Color(red: 16/255, green: 185/255, blue: 129/255))
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .buttonStyle(.plain)
+
+            Button(intent: DowngradeTaskStatusIntent(taskId: taskId, currentStatus: currentStatus)) {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .padding(5)
+                    .background(Color.white.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -659,6 +761,24 @@ public struct RecurringTaskWidgetView: View {
                 .font(.system(size: isCompact ? 9 : 10))
                 .foregroundStyle(.white.opacity(0.6))
                 .multilineTextAlignment(.center)
+
+            if let recent = SharedWidgetDataManager.shared.getRecentlyCompletedTask() {
+                Button(intent: UpdateTaskStatusIntent(taskId: recent.id, newStatus: "in_progress")) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.uturn.backward.circle.fill")
+                            .font(.system(size: isCompact ? 9 : 11, weight: .bold))
+                        Text(L10n.Widgets.recurringActionReopen)
+                            .font(.system(size: isCompact ? 9 : 10, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, isCompact ? 7 : 10)
+                    .padding(.vertical, isCompact ? 3 : 4.5)
+                    .background(Color.white.opacity(0.14))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -826,20 +946,32 @@ public struct CustomTaskWidgetView: View {
                 let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
 
                 if allChecked {
-                    Button(intent: UpdateTaskStatusIntent(taskId: task.id, newStatus: "done")) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 10, weight: .bold))
-                            Text(L10n.Widgets.recurringActionDone)
-                                .font(.system(size: 10, weight: .bold))
+                    HStack(spacing: 4) {
+                        Button(intent: UpdateTaskStatusIntent(taskId: task.id, newStatus: "done")) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(L10n.Widgets.recurringActionDoneShort)
+                                    .font(.system(size: 10, weight: .bold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                            .background(Color(red: 16/255, green: 185/255, blue: 129/255))
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 4)
-                        .background(Color(red: 16/255, green: 185/255, blue: 129/255))
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .buttonStyle(.plain)
+
+                        Button(intent: DowngradeTaskStatusIntent(taskId: task.id, currentStatus: task.status)) {
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .padding(5)
+                                .background(Color.white.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 } else if p.subtasks.isEmpty {
                     Text(L10n.Widgets.customNoSubtasks)
                         .font(.system(size: 10))
@@ -920,6 +1052,8 @@ public struct CustomTaskWidgetView: View {
                         CompactSubtaskPill(taskId: task.id, currentPage: p.page, totalPages: p.totalPages)
                     }
 
+                    statusTransitionPill(task: task)
+
                     let pri = task.priority
                     Text(pri.uppercased())
                         .font(.system(size: 8, weight: .black))
@@ -934,7 +1068,7 @@ public struct CustomTaskWidgetView: View {
                 let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
 
                 if allChecked {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Button(intent: UpdateTaskStatusIntent(taskId: task.id, newStatus: "done")) {
                             HStack(spacing: 4) {
                                 Image(systemName: "checkmark.circle.fill")
@@ -950,11 +1084,41 @@ public struct CustomTaskWidgetView: View {
                         }
                         .buttonStyle(.plain)
 
+                        Button(intent: UpdateTaskStatusIntent(taskId: task.id, newStatus: "in_review")) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "eye.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(L10n.Widgets.recurringActionReview)
+                                    .font(.system(size: 10, weight: .bold))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.12))
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(intent: DowngradeTaskStatusIntent(taskId: task.id, currentStatus: task.status)) {
+                            HStack(spacing: 2) {
+                                Image(systemName: "arrow.uturn.backward")
+                                    .font(.system(size: 9, weight: .bold))
+                                Text(L10n.Widgets.recurringActionRevert)
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.08))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+
                         if activeTasks.count > 1 {
                             Button(intent: CycleNextTaskIntent()) {
-                                Text(L10n.Widgets.customOtherTask)
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .padding(.horizontal, 10)
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 7)
                                     .padding(.vertical, 6)
                                     .background(Color.white.opacity(0.1))
                                     .foregroundStyle(.white)
@@ -1034,10 +1198,16 @@ public struct CustomTaskWidgetView: View {
             }
 
             if let task = currentTask {
-                Text(task.title)
-                    .font(.system(size: 15, weight: .bold))
-                    .lineLimit(1)
-                    .foregroundStyle(.white)
+                HStack(alignment: .center) {
+                    Text(task.title)
+                        .font(.system(size: 15, weight: .bold))
+                        .lineLimit(1)
+                        .foregroundStyle(.white)
+
+                    Spacer()
+
+                    statusTransitionPill(task: task)
+                }
 
                 let p = SubtaskPaginationHelper.paginate(task: task, pageSize: 5)
                 let allChecked = !(task.subtasks ?? []).isEmpty && (task.subtasks ?? []).allSatisfy { $0.isCompleted || $0.isCancelled }
@@ -1053,20 +1223,52 @@ public struct CustomTaskWidgetView: View {
                 }
 
                 if allChecked {
-                    Button(intent: UpdateTaskStatusIntent(taskId: task.id, newStatus: "done")) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 12, weight: .bold))
-                            Text(L10n.Widgets.customCompleteNow)
-                                .font(.system(size: 12, weight: .bold))
+                    HStack(spacing: 8) {
+                        Button(intent: UpdateTaskStatusIntent(taskId: task.id, newStatus: "done")) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 12, weight: .bold))
+                                Text(L10n.Widgets.customCompleteNow)
+                                    .font(.system(size: 12, weight: .bold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 7)
+                            .background(Color(red: 16/255, green: 185/255, blue: 129/255))
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
-                        .background(Color(red: 16/255, green: 185/255, blue: 129/255))
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .buttonStyle(.plain)
+
+                        Button(intent: UpdateTaskStatusIntent(taskId: task.id, newStatus: "in_review")) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "eye.fill")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text(L10n.Widgets.recurringActionReview)
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(Color.white.opacity(0.12))
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(intent: DowngradeTaskStatusIntent(taskId: task.id, currentStatus: task.status)) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "arrow.uturn.backward")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(L10n.Widgets.recurringActionRevert)
+                                    .font(.system(size: 10, weight: .bold))
+                            }
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 7)
+                            .background(Color.white.opacity(0.08))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             } else {
                 let isAuto = SharedWidgetDataManager.shared.isAutoSelectAllEnabled()
@@ -1139,6 +1341,73 @@ public struct CustomTaskWidgetView: View {
     }
 
     @ViewBuilder
+    private func statusTransitionPill(task: TaskItem) -> some View {
+        let status = task.status.lowercased()
+        switch status {
+        case "todo", "backlog":
+            Button(intent: UpdateTaskStatusIntent(taskId: task.id, newStatus: "in_progress")) {
+                HStack(spacing: 3) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 7, weight: .bold))
+                    Text(L10n.Widgets.recurringActionStart)
+                        .font(.system(size: 8, weight: .bold))
+                }
+                .foregroundStyle(Color(red: 168/255, green: 85/255, blue: 247/255))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.18))
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+
+        case "in_progress":
+            HStack(spacing: 3) {
+                Button(intent: DowngradeTaskStatusIntent(taskId: task.id, currentStatus: "in_progress")) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .padding(3)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+
+                Text(L10n.Widgets.recurringActionInProgress)
+                    .font(.system(size: 8, weight: .black))
+                    .foregroundStyle(Color(red: 251/255, green: 191/255, blue: 36/255))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color(red: 251/255, green: 191/255, blue: 36/255).opacity(0.15))
+                    .clipShape(Capsule())
+            }
+
+        case "in_review", "review":
+            HStack(spacing: 3) {
+                Button(intent: DowngradeTaskStatusIntent(taskId: task.id, currentStatus: "in_review")) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .padding(3)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+
+                Text(L10n.Widgets.recurringActionReview)
+                    .font(.system(size: 8, weight: .black))
+                    .foregroundStyle(Color(red: 168/255, green: 85/255, blue: 247/255))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.15))
+                    .clipShape(Capsule())
+            }
+
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
     private func emptyTasksView(isCompact: Bool) -> some View {
         VStack(spacing: isCompact ? 4 : 6) {
             Image(systemName: "checkmark.seal.fill")
@@ -1149,7 +1418,23 @@ public struct CustomTaskWidgetView: View {
                 .font(.system(size: isCompact ? 11 : 12, weight: .semibold))
                 .foregroundStyle(.white)
 
-            if !isCompact {
+            if let recent = SharedWidgetDataManager.shared.getRecentlyCompletedTask() {
+                Button(intent: UpdateTaskStatusIntent(taskId: recent.id, newStatus: "in_progress")) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.uturn.backward.circle.fill")
+                            .font(.system(size: isCompact ? 9 : 11, weight: .bold))
+                        Text(L10n.Widgets.recurringActionReopen)
+                            .font(.system(size: isCompact ? 9 : 10, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, isCompact ? 7 : 10)
+                    .padding(.vertical, isCompact ? 3 : 4.5)
+                    .background(Color.white.opacity(0.14))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
+            } else if !isCompact {
                 Text(L10n.Widgets.customAddNewTask)
                     .font(.system(size: 9))
                     .foregroundStyle(.white.opacity(0.5))
