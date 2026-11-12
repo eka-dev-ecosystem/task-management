@@ -3,6 +3,8 @@ package cloud.eka_dev.task_hub
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -13,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
+import cloud.eka_dev.task_hub.core.designsystem.SplashScreen
 import cloud.eka_dev.task_hub.core.designsystem.TaskManagementTheme
 import cloud.eka_dev.task_hub.feature.auth.AuthScreen
 import cloud.eka_dev.task_hub.feature.auth.AuthViewModel
@@ -48,32 +51,43 @@ class MainActivity : ComponentActivity() {
         setContent {
             TaskManagementTheme {
                 val tokenState by app.tokenManager.accessTokenFlow.collectAsState(initial = "loading")
+                var splashCompleted by remember { mutableStateOf(false) }
 
-                if (tokenState == "loading") {
-                    // Splash loading
-                } else if (tokenState.isNullOrEmpty()) {
-                    AuthScreen(
-                        viewModel = authViewModel,
-                        onAuthSuccess = {
-                            taskViewModel.loadTasks()
-                            projectViewModel.loadData()
-                            calendarViewModel.loadMonthData(calendarViewModel.currentMonth.value)
-                            noteViewModel.loadNotes()
-                            reminderViewModel.loadReminders()
-                            profileViewModel.loadProfile()
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (tokenState != "loading") {
+                        if (tokenState.isNullOrEmpty()) {
+                            AuthScreen(
+                                viewModel = authViewModel,
+                                onAuthSuccess = {
+                                    taskViewModel.loadTasks()
+                                    projectViewModel.loadData()
+                                    calendarViewModel.loadMonthData(calendarViewModel.currentMonth.value)
+                                    noteViewModel.loadNotes()
+                                    reminderViewModel.loadReminders()
+                                    profileViewModel.loadProfile()
+                                }
+                            )
+                        } else {
+                            MainNavigationScaffold(
+                                taskViewModel = taskViewModel,
+                                projectViewModel = projectViewModel,
+                                calendarViewModel = calendarViewModel,
+                                noteViewModel = noteViewModel,
+                                reminderViewModel = reminderViewModel,
+                                profileViewModel = profileViewModel,
+                                mcpViewModel = mcpViewModel,
+                                onSignOut = { authViewModel.signOut() }
+                            )
                         }
-                    )
-                } else {
-                    MainNavigationScaffold(
-                        taskViewModel = taskViewModel,
-                        projectViewModel = projectViewModel,
-                        calendarViewModel = calendarViewModel,
-                        noteViewModel = noteViewModel,
-                        reminderViewModel = reminderViewModel,
-                        profileViewModel = profileViewModel,
-                        mcpViewModel = mcpViewModel,
-                        onSignOut = { authViewModel.signOut() }
-                    )
+                    }
+
+                    if (!splashCompleted || tokenState == "loading") {
+                        SplashScreen(
+                            onComplete = {
+                                splashCompleted = true
+                            }
+                        )
+                    }
                 }
             }
         }

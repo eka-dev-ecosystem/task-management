@@ -78,6 +78,7 @@ struct TaskManagementApp: App {
     #endif
     @Environment(\.scenePhase) private var scenePhase
     @State private var authViewModel = AuthViewModel()
+    @State private var showSplash: Bool = true
     @AppStorage("app_appearance") private var appAppearance: String = "system"
 
     init() {
@@ -97,13 +98,29 @@ struct TaskManagementApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if authViewModel.isAuthenticated {
-                    MainTabView(authViewModel: authViewModel)
-                } else {
-                    AuthView(viewModel: authViewModel, onAuthSuccess: {
-                        authViewModel.isAuthenticated = true
-                    })
+            ZStack {
+                Group {
+                    if authViewModel.isAuthenticated {
+                        MainTabView(authViewModel: authViewModel)
+                    } else {
+                        AuthView(viewModel: authViewModel, onAuthSuccess: {
+                            authViewModel.isAuthenticated = true
+                        })
+                    }
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+
+                if showSplash {
+                    SplashScreenView {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                            showSplash = false
+                        }
+                    }
+                    .transition(.asymmetric(
+                        insertion: .identity,
+                        removal: .opacity.combined(with: .scale(scale: 1.06))
+                    ))
+                    .zIndex(100)
                 }
             }
             .preferredColorScheme(colorScheme)
