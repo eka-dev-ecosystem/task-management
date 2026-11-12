@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -1175,7 +1176,7 @@ func TestTaskService_DeadlineChangePushNotification(t *testing.T) {
 		},
 	}
 
-	pushCh := make(chan map[string]string, 1)
+	pushCh := make(chan map[string]string, 5)
 	pushSender := &mockTaskPushSender{sentCh: pushCh}
 	reminderRepo := &mockTaskReminderRepo{tokens: []string{"fcm-device-token-abc"}}
 
@@ -1189,16 +1190,20 @@ func TestTaskService_DeadlineChangePushNotification(t *testing.T) {
 		t.Fatalf("unexpected error updating task: %v", err)
 	}
 
-	select {
-	case payload := <-pushCh:
-		if payload["type"] != "task_deadline_updated" {
-			t.Errorf("expected type 'task_deadline_updated', got '%s'", payload["type"])
+	foundDeadlinePush := false
+	timeout := time.After(2 * time.Second)
+	for !foundDeadlinePush {
+		select {
+		case payload := <-pushCh:
+			if payload["type"] == "task_deadline_updated" {
+				foundDeadlinePush = true
+				if payload["task_id"] != "101" {
+					t.Errorf("expected task_id '101', got '%s'", payload["task_id"])
+				}
+			}
+		case <-timeout:
+			t.Fatalf("timed out waiting for task_deadline_updated push notification to be dispatched")
 		}
-		if payload["task_id"] != "101" {
-			t.Errorf("expected task_id '101', got '%s'", payload["task_id"])
-		}
-	case <-time.After(2 * time.Second):
-		t.Errorf("timed out waiting for push notification to be dispatched")
 	}
 }
 
@@ -2370,6 +2375,59 @@ func TestTaskService_UpdateTask_SyncToRecurringMasterEdgeCases(t *testing.T) {
 			t.Errorf("expected Asynq task recurrence to be cancelled for master %d", masterID)
 		}
 	})
+}
+
+func TestTaskService_BroadcastWidgetSyncPush_SilentPush(t *testing.T) {
+	ctx := context.Background()
+	userID := "user-widget-test"
+	taskID := int64(301)
+
+	mockRepo := &mockRepository{
+		createFunc: func(ctx context.Context, uID string, req CreateTaskRequest) (*TaskResponse, error) {
+			return &TaskResponse{
+				ID:       taskID,
+				UserID:   uID,
+				Title:    req.Title,
+				Status:   "todo",
+				Priority: "high",
+			}, nil
+		},
+		createActivityFunc: func(ctx context.Context, tID int64, uID string, actType string, desc string, ch []byte) (*TaskActivityResponse, error) {
+			return &TaskActivityResponse{ID: 1}, nil
+		},
+		getUserThresholdFunc: func(ctx context.Context, uID string) (int, string, error) {
+			return 15, "Asia/Jakarta", nil
+		},
+	}
+
+	pushCh := make(chan map[string]string, 2)
+	pushSender := &mockTaskPushSender{sentCh: pushCh}
+	reminderRepo := &mockTaskReminderRepo{tokens: []string{"fcm-token-12345"}}
+
+	svc := NewService(mockRepo, &mockTransactor{})
+	svc.SetNotificationDependencies(nil, nil, pushSender, reminderRepo, nil, nil)
+
+	_, err := svc.Create(ctx, userID, CreateTaskRequest{
+		Title: "Widget Test Task",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating task: %v", err)
+	}
+
+	select {
+	case payload := <-pushCh:
+		if payload["type"] != "widget:sync" {
+			t.Errorf("expected type 'widget:sync', got '%s'", payload["type"])
+		}
+		if payload["event"] != "task:created" {
+			t.Errorf("expected event 'task:created', got '%s'", payload["event"])
+		}
+		if payload["task_id"] != fmt.Sprintf("%d", taskID) {
+			t.Errorf("expected task_id '%d', got '%s'", taskID, payload["task_id"])
+		}
+	case <-time.After(2 * time.Second):
+		t.Errorf("timed out waiting for silent push notification on task creation")
+	}
 }
 
 
