@@ -239,6 +239,7 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
                     if completedCount + cancelledCount == subtasks.count && subtasks.count > 0 {
                         task.status = "done"
                         task.isFocus = false
+                        saveRecentlyCompletedTaskLocked(task)
                     } else if !isCompleted && task.status == "done" {
                         task.status = "in_progress"
                     }
@@ -269,6 +270,7 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
                     if completedCount + cancelledCount == subtasks.count && subtasks.count > 0 {
                         task.status = "done"
                         task.isFocus = false
+                        saveRecentlyCompletedTaskLocked(task)
                     } else if !isCompleted && task.status == "done" {
                         task.status = "in_progress"
                     }
@@ -424,42 +426,76 @@ public final class SharedWidgetDataManager: @unchecked Sendable {
 
     // MARK: - Task Status Updates Directly from Widget
 
-    public func getRecentlyCompletedTask() -> TaskItem? {
+    public struct RecentlyCompletedRecord: Codable {
+        public let task: TaskItem
+        public let completedAt: Date
+
+        public init(task: TaskItem, completedAt: Date = Date()) {
+            self.task = task
+            self.completedAt = completedAt
+        }
+    }
+
+    /// Returns the most recently completed task if it was completed within the given TTL (default: 10 minutes / 600s).
+    public func getRecentlyCompletedTask(maxAge: TimeInterval = 600) -> TaskItem? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let data = defaults.data(forKey: recentlyCompletedTasksKey) else {
+            return nil
+        }
+        if let records = try? JSONDecoder().decode([RecentlyCompletedRecord].self, from: data) {
+            let now = Date()
+            let valid = records.filter { now.timeIntervalSince($0.completedAt) <= maxAge }
+            if valid.count != records.count {
+                if let encoded = try? JSONEncoder().encode(valid) {
+                    defaults.set(encoded, forKey: recentlyCompletedTasksKey)
+                }
+            }
+            return valid.first?.task
+        }
+        defaults.removeObject(forKey: recentlyCompletedTasksKey)
+        return nil
+    }
+
+    /// Returns the expiration date of the most recently completed task so WidgetKit can schedule a refresh.
+    public func getRecentlyCompletedTaskExpiration(maxAge: TimeInterval = 600) -> Date? {
         lock.lock()
         defer { lock.unlock() }
         guard let data = defaults.data(forKey: recentlyCompletedTasksKey),
-              let list = try? JSONDecoder().decode([TaskItem].self, from: data) else {
+              let records = try? JSONDecoder().decode([RecentlyCompletedRecord].self, from: data),
+              let first = records.first else {
             return nil
         }
-        return list.first
+        let exp = first.completedAt.addingTimeInterval(maxAge)
+        return exp > Date() ? exp : nil
     }
 
     private func saveRecentlyCompletedTaskLocked(_ task: TaskItem) {
-        var list: [TaskItem] = []
+        var records: [RecentlyCompletedRecord] = []
         if let data = defaults.data(forKey: recentlyCompletedTasksKey),
-           let existing = try? JSONDecoder().decode([TaskItem].self, from: data) {
-            list = existing.filter { $0.id != task.id }
+           let existing = try? JSONDecoder().decode([RecentlyCompletedRecord].self, from: data) {
+            records = existing.filter { $0.task.id != task.id && Date().timeIntervalSince($0.completedAt) <= 600 }
         }
-        list.insert(task, at: 0)
-        if list.count > 5 {
-            list = Array(list.prefix(5))
+        records.insert(RecentlyCompletedRecord(task: task, completedAt: Date()), at: 0)
+        if records.count > 5 {
+            records = Array(records.prefix(5))
         }
-        if let encoded = try? JSONEncoder().encode(list) {
+        if let encoded = try? JSONEncoder().encode(records) {
             defaults.set(encoded, forKey: recentlyCompletedTasksKey)
         }
     }
 
     private func removeRecentlyCompletedTaskLocked(taskId: Int64) -> TaskItem? {
         guard let data = defaults.data(forKey: recentlyCompletedTasksKey),
-              var list = try? JSONDecoder().decode([TaskItem].self, from: data) else {
+              var records = try? JSONDecoder().decode([RecentlyCompletedRecord].self, from: data) else {
             return nil
         }
-        if let idx = list.firstIndex(where: { $0.id == taskId }) {
-            let item = list.remove(at: idx)
-            if let encoded = try? JSONEncoder().encode(list) {
+        if let idx = records.firstIndex(where: { $0.task.id == taskId }) {
+            let item = records.remove(at: idx)
+            if let encoded = try? JSONEncoder().encode(records) {
                 defaults.set(encoded, forKey: recentlyCompletedTasksKey)
             }
-            return item
+            return item.task
         }
         return nil
     }

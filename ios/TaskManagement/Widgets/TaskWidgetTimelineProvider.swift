@@ -118,7 +118,12 @@ public struct TaskWidgetTimelineProvider: TimelineProvider {
     public func getTimeline(in context: Context, completion: @escaping (Timeline<TaskWidgetEntry>) -> Void) {
         let cached = SharedWidgetDataManager.shared.loadWidgetBundle() ?? TaskWidgetEntry.empty.bundle
         let currentEntry = TaskWidgetEntry(date: Date(), bundle: cached, isOffline: false)
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date()) ?? Date().addingTimeInterval(900)
+        var nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date()) ?? Date().addingTimeInterval(900)
+        if let expiration = SharedWidgetDataManager.shared.getRecentlyCompletedTaskExpiration() {
+            if expiration > Date() && expiration < nextUpdate {
+                nextUpdate = expiration
+            }
+        }
 
         // If no auth token, deliver cached immediately
         guard SharedWidgetDataManager.shared.getAuthToken() != nil else {
