@@ -79,6 +79,7 @@ struct TaskManagementApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var authViewModel = AuthViewModel()
     @State private var showSplash: Bool = true
+    @State private var pendingHubLink: HubLinkSessionPayload?
     @AppStorage("app_appearance") private var appAppearance: String = "system"
 
     init() {
@@ -126,8 +127,15 @@ struct TaskManagementApp: App {
             .preferredColorScheme(colorScheme)
             .environment(\.locale, Locale(identifier: I18n.shared.currentLanguage.rawValue))
             .onOpenURL { url in
-                if url.scheme != "taskhub" {
+                if url.scheme == "taskhub" {
+                    handleTaskHubDeepLink(url)
+                } else {
                     _ = GIDSignIn.sharedInstance.handle(url)
+                }
+            }
+            .sheet(item: $pendingHubLink) { payload in
+                HubLinkConfirmationView(payload: payload) {
+                    pendingHubLink = nil
                 }
             }
             .onChange(of: authViewModel.isAuthenticated) { _, isAuthenticated in
@@ -143,6 +151,18 @@ struct TaskManagementApp: App {
                         await SharedWidgetDataManager.shared.syncWithBackend()
                     }
                 }
+            }
+        }
+    }
+
+    private func handleTaskHubDeepLink(_ url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+        let host = url.host ?? ""
+        if host == "connect-hub" || url.path.contains("connect-hub") {
+            let sessionCode = components.queryItems?.first(where: { $0.name == "session_code" })?.value ?? ""
+            let callbackURL = components.queryItems?.first(where: { $0.name == "callback_url" })?.value ?? "ekahub://link-callback"
+            if !sessionCode.isEmpty {
+                pendingHubLink = HubLinkSessionPayload(sessionCode: sessionCode, callbackURL: callbackURL)
             }
         }
     }

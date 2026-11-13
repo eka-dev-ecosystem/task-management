@@ -18,6 +18,7 @@
 		50AA8A8D15A0EBEB0FD6A0F0 /* TaskManagement/Core/Security/KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DD760D112150DABFD231E73 /* TaskManagement/Core/Security/KeychainManager.swift */; };
 		6B3427E98BAF1646F3621E1C /* TaskManagement/Core/Network/NetworkLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DE12D7279FE4F14230F285D /* TaskManagement/Core/Network/NetworkLogger.swift */; };
 		7527F928B2E130118A315B05 /* TaskManagement/Core/DesignSystem/Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = D727559B70DECCA78B55B808 /* TaskManagement/Core/DesignSystem/Components.swift */; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* TaskManagement/Features/HubIntegration/HubLinkConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5A6B7C8D9E0F1A2 /* TaskManagement/Features/HubIntegration/HubLinkConfirmationView.swift */; };
 		9179CC5DC9DB4AA927B1C295 /* TaskManagement/TaskManagementApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9DFCD922BDDF3E839E72F63 /* TaskManagement/TaskManagementApp.swift */; };
 		9272ACA4FBD5E2DCEEE1B76B /* TaskManagement/Features/Task/TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87A59A2BEBD351712627D39 /* TaskManagement/Features/Task/TaskListView.swift */; };
 		B1865589A46D9C79AD9A5811 /* TaskManagement/Core/Models/Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B333900B01AC551774C3B528 /* TaskManagement/Core/Models/Models.swift */; };
@@ -173,6 +174,7 @@
 		PR0102030405060708090001 /* TaskManagementWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TaskManagementWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		IN0102030405060708090001 /* TaskManagementWidgets/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = TaskManagementWidgets/Info.plist; sourceTree = "<group>"; };
 		EN0102030405060708090001 /* TaskManagementWidgets/TaskManagementWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TaskManagementWidgets/TaskManagementWidgets.entitlements; sourceTree = "<group>"; };
+		B1C2D3E4F5A6B7C8D9E0F1A2 /* TaskManagement/Features/HubIntegration/HubLinkConfirmationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskManagement/Features/HubIntegration/HubLinkConfirmationView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -248,6 +250,7 @@
 				WI0102030405060708090011 /* TaskManagement/Widgets/TaskHubWidgets.swift */,
 				WI0102030405060708090013 /* TaskManagement/Widgets/ChecklistWidgetView.swift */,
 				WI0102030405060708090015 /* TaskManagement/Widgets/LockScreenWidgetView.swift */,
+				B1C2D3E4F5A6B7C8D9E0F1A2 /* TaskManagement/Features/HubIntegration/HubLinkConfirmationView.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -401,6 +404,7 @@
 				WI0102030405060708090010 /* TaskManagement/Widgets/DeadlinesWidgetView.swift in Sources */,
 				WI0102030405060708090014 /* TaskManagement/Widgets/ChecklistWidgetView.swift in Sources */,
 				WI0102030405060708090016 /* TaskManagement/Widgets/LockScreenWidgetView.swift in Sources */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* TaskManagement/Features/HubIntegration/HubLinkConfirmationView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

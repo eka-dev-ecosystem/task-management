@@ -1,5 +1,6 @@
 package cloud.eka_dev.task_hub
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,6 +22,8 @@ import cloud.eka_dev.task_hub.feature.auth.AuthScreen
 import cloud.eka_dev.task_hub.feature.auth.AuthViewModel
 import cloud.eka_dev.task_hub.feature.calendar.CalendarScreen
 import cloud.eka_dev.task_hub.feature.calendar.CalendarViewModel
+import cloud.eka_dev.task_hub.feature.hub.HubLinkConfirmationBottomSheet
+import cloud.eka_dev.task_hub.feature.hub.HubLinkSessionPayload
 import cloud.eka_dev.task_hub.feature.mcp.McpScreen
 import cloud.eka_dev.task_hub.feature.mcp.McpViewModel
 import cloud.eka_dev.task_hub.feature.note.NoteScreen
@@ -35,8 +38,11 @@ import cloud.eka_dev.task_hub.feature.task.TaskListScreen
 import cloud.eka_dev.task_hub.feature.task.TaskViewModel
 
 class MainActivity : ComponentActivity() {
+    private var pendingHubLink by mutableStateOf<HubLinkSessionPayload?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleDeepLink(intent)
         val app = application as TaskApp
 
         val authViewModel = AuthViewModel(app.apiClient, app.tokenManager)
@@ -88,7 +94,35 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
+
+                    pendingHubLink?.let { payload ->
+                        HubLinkConfirmationBottomSheet(
+                            payload = payload,
+                            tokenManager = app.tokenManager,
+                            onDismiss = { pendingHubLink = null }
+                        )
+                    }
                 }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme == "taskhub" && (uri.host == "connect-hub" || uri.path?.contains("connect-hub") == true)) {
+            val sessionCode = uri.getQueryParameter("session_code")
+            val callbackUrl = uri.getQueryParameter("callback_url") ?: "ekahub://link-callback"
+            if (!sessionCode.isNullOrEmpty()) {
+                pendingHubLink = HubLinkSessionPayload(
+                    sessionCode = sessionCode,
+                    callbackUrl = callbackUrl
+                )
             }
         }
     }

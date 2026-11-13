@@ -39,6 +39,10 @@ class TokenManager(private val context: Context) {
         return context.dataStore.data.map { it[USER_NAME_KEY] }.first()
     }
 
+    suspend fun getUserEmail(): String? {
+        return context.dataStore.data.map { it[USER_EMAIL_KEY] }.first()
+    }
+
     suspend fun saveTokens(accessToken: String, refreshToken: String) {
         context.dataStore.edit { prefs ->
             prefs[ACCESS_TOKEN_KEY] = accessToken
