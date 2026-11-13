@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    if (!splashCompleted || tokenState == "loading") {
+                    if ((!splashCompleted || tokenState == "loading") && pendingHubLink == null) {
                         SplashScreen(
                             onComplete = {
                                 splashCompleted = true

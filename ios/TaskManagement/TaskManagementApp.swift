@@ -111,7 +111,7 @@ struct TaskManagementApp: App {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.98)))
 
-                if showSplash {
+                if showSplash && pendingHubLink == nil {
                     SplashScreenView {
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
                             showSplash = false
@@ -162,6 +162,7 @@ struct TaskManagementApp: App {
             let sessionCode = components.queryItems?.first(where: { $0.name == "session_code" })?.value ?? ""
             let callbackURL = components.queryItems?.first(where: { $0.name == "callback_url" })?.value ?? "ekahub://link-callback"
             if !sessionCode.isEmpty {
+                showSplash = false
                 pendingHubLink = HubLinkSessionPayload(sessionCode: sessionCode, callbackURL: callbackURL)
             }
         }
