@@ -296,6 +296,8 @@ public enum L10n {
         public static var sectionAssociation: String { "reminders.section.association".localized }
         public static var remindAt: String { "reminders.remindAt".localized }
         public static var presets: String { "reminders.presets".localized }
+        public static var presetDeadlineSection: String { "reminders.presetDeadlineSection".localized }
+        public static var presetAtDeadline: String { "reminders.presetAtDeadline".localized }
         public static var tomorrowMorning: String { "reminders.tomorrowMorning".localized }
         public static var taskNone: String { "reminders.taskNone".localized }
         public static var snooze: String { "reminders.snooze".localized }

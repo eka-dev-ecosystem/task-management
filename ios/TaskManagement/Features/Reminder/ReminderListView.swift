@@ -785,6 +785,7 @@ public struct CreateReminderSheet: View {
     @State private var remindAt: Date = Date().addingTimeInterval(3600)
     @State private var selectedTaskId: Int64? = nil
     @State private var selectedTaskTitle: String? = nil
+    @State private var selectedTaskDueDate: String? = nil
     @State private var isShowingTaskPicker = false
     @State private var selectedSoundId: String = SoundManager.shared.selectedSoundId
 
@@ -816,6 +817,31 @@ public struct CreateReminderSheet: View {
                         displayedComponents: [.date, .hourAndMinute]
                     )
                     .environment(\.timeZone, DateTimeHelper.userTimeZone)
+
+                    // Deadline Presets if linked task has due date
+                    if let dueStr = selectedTaskDueDate, let dueDate = DateTimeHelper.parseISO8601(dueStr) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "calendar.badge.clock")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(AppColors.primary)
+                                Text(L10n.Reminders.presetDeadlineSection)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(AppColors.primary)
+                                Text("(\(DateTimeHelper.formatFullDateTime(dueStr)))")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+
+                            HStack(spacing: 6) {
+                                presetDeadlineButton(label: "-15m", minutes: 15, dueDate: dueDate, titlePrefix: "15m sebelum deadline")
+                                presetDeadlineButton(label: "-1h", minutes: 60, dueDate: dueDate, titlePrefix: "1 jam sebelum deadline")
+                                presetDeadlineButton(label: "-1d", minutes: 1440, dueDate: dueDate, titlePrefix: "1 hari sebelum deadline")
+                                presetDeadlineButton(label: L10n.Reminders.presetAtDeadline, minutes: 0, dueDate: dueDate, titlePrefix: L10n.Reminders.presetAtDeadline)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
 
                     // Quick Presets
                     VStack(alignment: .leading, spacing: 8) {
@@ -882,6 +908,7 @@ public struct CreateReminderSheet: View {
                             Button(action: {
                                 selectedTaskId = nil
                                 selectedTaskTitle = nil
+                                selectedTaskDueDate = nil
                             }) {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(.secondary)
@@ -957,13 +984,38 @@ public struct CreateReminderSheet: View {
                     if let t = chosenTask {
                         selectedTaskId = t.id
                         selectedTaskTitle = t.title
+                        selectedTaskDueDate = t.dueDate
                     } else {
                         selectedTaskId = nil
                         selectedTaskTitle = nil
+                        selectedTaskDueDate = nil
                     }
                 }
             }
         }
+    }
+
+    private func presetDeadlineButton(label: String, minutes: Int, dueDate: Date, titlePrefix: String) -> some View {
+        Button(action: {
+            var target = dueDate.addingTimeInterval(TimeInterval(-minutes * 60))
+            let now = Date()
+            if target < now {
+                target = now.addingTimeInterval(300)
+            }
+            remindAt = target
+            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let taskName = selectedTaskTitle {
+                title = "\(titlePrefix): \(taskName)"
+            }
+        }) {
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(AppColors.primary.opacity(0.12))
+                .foregroundColor(AppColors.primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func presetButton(label: String, minutes: Int) -> some View {
@@ -1005,6 +1057,7 @@ public struct EditReminderSheet: View {
     @State private var status: String
     @State private var selectedTaskId: Int64?
     @State private var selectedTaskTitle: String?
+    @State private var selectedTaskDueDate: String? = nil
     @State private var isShowingTaskPicker = false
     @State private var selectedSoundId: String = SoundManager.shared.selectedSoundId
     @State private var isSubmitting: Bool = false
@@ -1047,6 +1100,31 @@ public struct EditReminderSheet: View {
                         displayedComponents: [.date, .hourAndMinute]
                     )
                     .environment(\.timeZone, DateTimeHelper.userTimeZone)
+
+                    // Deadline Presets if linked task has due date
+                    if let dueStr = selectedTaskDueDate, let dueDate = DateTimeHelper.parseISO8601(dueStr) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "calendar.badge.clock")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(AppColors.primary)
+                                Text(L10n.Reminders.presetDeadlineSection)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(AppColors.primary)
+                                Text("(\(DateTimeHelper.formatFullDateTime(dueStr)))")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+
+                            HStack(spacing: 6) {
+                                presetDeadlineButton(label: "-15m", minutes: 15, dueDate: dueDate, titlePrefix: "15m sebelum deadline")
+                                presetDeadlineButton(label: "-1h", minutes: 60, dueDate: dueDate, titlePrefix: "1 jam sebelum deadline")
+                                presetDeadlineButton(label: "-1d", minutes: 1440, dueDate: dueDate, titlePrefix: "1 hari sebelum deadline")
+                                presetDeadlineButton(label: L10n.Reminders.presetAtDeadline, minutes: 0, dueDate: dueDate, titlePrefix: L10n.Reminders.presetAtDeadline)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
 
                     // Quick Presets
                     VStack(alignment: .leading, spacing: 8) {
@@ -1124,6 +1202,7 @@ public struct EditReminderSheet: View {
                             Button(action: {
                                 selectedTaskId = nil
                                 selectedTaskTitle = nil
+                                selectedTaskDueDate = nil
                             }) {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(.secondary)
@@ -1189,13 +1268,45 @@ public struct EditReminderSheet: View {
                     if let t = chosenTask {
                         selectedTaskId = t.id
                         selectedTaskTitle = t.title
+                        selectedTaskDueDate = t.dueDate
                     } else {
                         selectedTaskId = nil
                         selectedTaskTitle = nil
+                        selectedTaskDueDate = nil
+                    }
+                }
+            }
+            .task {
+                if let tid = selectedTaskId, selectedTaskDueDate == nil {
+                    if let task = try? await APIClient.shared.getTask(id: tid) {
+                        selectedTaskDueDate = task.dueDate
                     }
                 }
             }
         }
+    }
+
+    private func presetDeadlineButton(label: String, minutes: Int, dueDate: Date, titlePrefix: String) -> some View {
+        Button(action: {
+            var target = dueDate.addingTimeInterval(TimeInterval(-minutes * 60))
+            let now = Date()
+            if target < now {
+                target = now.addingTimeInterval(300)
+            }
+            remindAt = target
+            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let taskName = selectedTaskTitle {
+                title = "\(titlePrefix): \(taskName)"
+            }
+        }) {
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(AppColors.primary.opacity(0.12))
+                .foregroundColor(AppColors.primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func handleSave() {

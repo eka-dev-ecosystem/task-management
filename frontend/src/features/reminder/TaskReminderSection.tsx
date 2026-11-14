@@ -250,6 +250,8 @@ export const TaskReminderSection = ({ taskId, taskTitle, dueDate }: TaskReminder
         }}
         initialTaskId={taskId}
         initialReminder={editingReminder}
+        initialDueDate={dueDate}
+        initialTaskTitle={taskTitle}
       />
     </div>
   )

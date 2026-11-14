@@ -1,5 +1,5 @@
 import { Calendar } from 'primereact/calendar'
-import React, { type FormEvent, useEffect, useRef, useState } from 'react'
+import React, { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getLocalizedErrorMessage } from '@/api'
 import { Skeleton } from '@/components'
@@ -12,13 +12,17 @@ interface ReminderModalProps {
   onClose: () => void
   initialTaskId?: number | null
   initialReminder?: Reminder | null
+  initialDueDate?: string | null
+  initialTaskTitle?: string | null
 }
 
 export const ReminderModal: React.FC<ReminderModalProps> = ({
   isOpen,
   onClose,
   initialTaskId = null,
-  initialReminder = null
+  initialReminder = null,
+  initialDueDate = null,
+  initialTaskTitle = null
 }) => {
   const { t, locale } = useTranslation()
 
@@ -92,19 +96,49 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
   )
   const searchResults = Array.isArray(rawSearchTasks) ? rawSearchTasks : []
 
-  if (!isOpen) return null
+  // Effective task deadline & title (supports prop fallback and selectedTask query)
+  const effectiveDueDate =
+    selectedTask?.due_date || (taskId === initialTaskId ? initialDueDate : null)
+  const effectiveTaskTitle =
+    selectedTask?.title || (taskId === initialTaskId ? initialTaskTitle : null) || initialReminder?.task_title || null
 
-  // Apply quick presets
-  const applyPreset = (minutes: number) => {
+  const dueDateObj = useMemo(
+    () => (effectiveDueDate ? new Date(effectiveDueDate) : null),
+    [effectiveDueDate]
+  )
+  const isValidDueDate = dueDateObj !== null && !isNaN(dueDateObj.getTime())
+
+  // Apply quick presets relative to task deadline
+  const applyDeadlinePreset = useCallback(
+    (minutesBefore: number, label: string) => {
+      if (!dueDateObj) return
+      const now = Date.now()
+      let target = new Date(dueDateObj.getTime() - minutesBefore * 60 * 1000)
+      // Don't set past reminder
+      if (target.getTime() < now) {
+        target = new Date(now + 5 * 60 * 1000)
+      }
+      setRemindAtDate(target)
+
+      // Auto-fill title if currently empty and task title is known
+      if (!title.trim() && effectiveTaskTitle) {
+        setTitle(`${label}: ${effectiveTaskTitle}`)
+      }
+    },
+    [dueDateObj, effectiveTaskTitle, title]
+  )
+
+  // Apply quick presets relative to now
+  const applyPreset = useCallback((minutes: number) => {
     setRemindAtDate(new Date(Date.now() + minutes * 60 * 1000))
-  }
+  }, [])
 
-  const applyTomorrowMorning = () => {
+  const applyTomorrowMorning = useCallback(() => {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
     tomorrow.setHours(9, 0, 0, 0)
     setRemindAtDate(tomorrow)
-  }
+  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -146,6 +180,8 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
   }
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending
+
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/45 dark:bg-slate-950/75 backdrop-blur-sm animate-fade-in">
@@ -380,6 +416,62 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
             </div>
 
             {/* Presets Button Row */}
+            {isValidDueDate && (
+              <div className="mb-2.5 p-2 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-900/60">
+                <div className="flex items-center justify-between text-[11px] text-indigo-700 dark:text-indigo-300 font-medium mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <i className="pi pi-calendar-times text-xs text-indigo-500" />
+                    <span>
+                      {t('reminders.presetDeadlineSection')}{' '}
+                      <span className="font-mono text-[10px] opacity-80">
+                        ({dueDateObj!.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false
+                        })})
+                      </span>
+                    </span>
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => applyDeadlinePreset(15, t('reminders.preset15mBefore'))}
+                    title={t('reminders.preset15mBefore')}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-semibold border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    {t('reminders.preset15m')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyDeadlinePreset(60, t('reminders.preset1hBefore'))}
+                    title={t('reminders.preset1hBefore')}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-semibold border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    {t('reminders.preset1h')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyDeadlinePreset(1440, t('reminders.preset1dBefore'))}
+                    title={t('reminders.preset1dBefore')}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-semibold border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    {t('reminders.preset1d')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyDeadlinePreset(0, t('reminders.presetAtDeadline'))}
+                    title={t('reminders.presetAtDeadlineTooltip')}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-semibold border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    {t('reminders.presetAtDeadline')}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-1.5 mb-2">
               <button
                 type="button"
