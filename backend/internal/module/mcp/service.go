@@ -515,7 +515,42 @@ func (s *service) callTool(ctx context.Context, userID string, name string, args
 		status, _ := args["status"].(string)
 		priority, _ := args["priority"].(string)
 		isFocus, _ := args["is_focus"].(bool)
-		subtasks := parseStringSlice(args["subtasks"])
+		var subtaskItems []task.CreateTaskSubtaskItem
+		if rawSubtasks, exists := args["subtasks"]; exists && rawSubtasks != nil {
+			switch stVal := rawSubtasks.(type) {
+			case []string:
+				for _, s := range stVal {
+					if trimmed := strings.TrimSpace(s); trimmed != "" {
+						subtaskItems = append(subtaskItems, task.CreateTaskSubtaskItem{Title: trimmed})
+					}
+				}
+			case []interface{}:
+				for _, item := range stVal {
+					switch v := item.(type) {
+					case string:
+						if trimmed := strings.TrimSpace(v); trimmed != "" {
+							subtaskItems = append(subtaskItems, task.CreateTaskSubtaskItem{Title: trimmed})
+						}
+					case map[string]interface{}:
+						title, _ := v["title"].(string)
+						desc, _ := v["description"].(string)
+						var ddPtr *time.Time
+						if dd, ok := v["due_date"].(string); ok && strings.TrimSpace(dd) != "" {
+							if t, err := parseDateTime(dd); err == nil {
+								ddPtr = &t
+							}
+						}
+						if strings.TrimSpace(title) != "" {
+							subtaskItems = append(subtaskItems, task.CreateTaskSubtaskItem{
+								Title:       strings.TrimSpace(title),
+								Description: strings.TrimSpace(desc),
+								DueDate:     ddPtr,
+							})
+						}
+					}
+				}
+			}
+		}
 		tags := parseStringSlice(args["tags"])
 		var projectIDPtr *int64
 		if pid := parseInt(args["project_id"], 0); pid > 0 {
@@ -545,7 +580,7 @@ func (s *service) callTool(ctx context.Context, userID string, name string, args
 			Priority:           priority,
 			DueDate:            dueTimePtr,
 			IsFocus:            isFocus,
-			Subtasks:           subtasks,
+			Subtasks:           subtaskItems,
 			Tags:               tags,
 			ProjectID:          projectIDPtr,
 			IsRecurring:        isRecurring,

@@ -1014,10 +1014,24 @@ public struct CreateTaskSheet: View {
     @State private var recurrencePattern: String = "daily"
     @State private var recurrenceInterval: Int = 1
     @State private var tagsText: String = ""
-    @State private var subtasks: [String] = []
-    @State private var newSubtaskText: String = ""
+    @State private var subtasks: [CreateTaskSubtaskItem] = []
+    @State private var newSubtaskTitle: String = ""
+    @State private var newSubtaskDescription: String = ""
+    @State private var hasSubtaskDueDate: Bool = false
+    @State private var newSubtaskDueDate: Date = Date().addingTimeInterval(3600 * 4)
+    @State private var isShowingSubtaskDetails: Bool = false
     @State private var isSubmitting: Bool = false
     @State private var errorMessage: String? = nil
+
+    private var isSubtaskExceedingParentDueDate: Bool {
+        guard !isRecurring, hasDueDate, hasSubtaskDueDate else { return false }
+        return newSubtaskDueDate > dueDate
+    }
+
+    private var canAddSubtask: Bool {
+        let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && !isSubtaskExceedingParentDueDate
+    }
 
     public init(
         viewModel: TaskViewModel,
@@ -1132,38 +1146,156 @@ public struct CreateTaskSheet: View {
                             .fontWeight(.bold)
                     }
                 }) {
-                    ForEach(Array(subtasks.enumerated()), id: \.offset) { index, item in
-                        HStack {
+                    ForEach(subtasks) { item in
+                        HStack(alignment: .top, spacing: 10) {
                             Image(systemName: "checkmark.circle")
                                 .foregroundColor(.secondary)
                                 .font(.system(size: 14))
-                            Text(item)
-                                .font(.system(size: 14))
+                                .padding(.top, 2)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.title)
+                                    .font(.system(size: 14, weight: .medium))
+
+                                let hasDesc = (item.description != nil && !item.description!.isEmpty)
+                                let hasDue = !isRecurring && (item.dueDate != nil && !item.dueDate!.isEmpty)
+                                if hasDesc || hasDue {
+                                    HStack(spacing: 6) {
+                                        if let desc = item.description, !desc.isEmpty {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "text.alignleft")
+                                                    .font(.system(size: 8))
+                                                Text(desc)
+                                                    .font(.system(size: 10))
+                                                    .lineLimit(1)
+                                            }
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(Color.secondary.opacity(0.12))
+                                            .foregroundColor(.secondary)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                        }
+
+                                        if !isRecurring, let due = item.dueDate, !due.isEmpty {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "calendar")
+                                                    .font(.system(size: 8))
+                                                Text(DateTimeHelper.formatFullDateTime(due))
+                                                    .font(.system(size: 10, weight: .medium))
+                                            }
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(Color.blue.opacity(0.12))
+                                            .foregroundColor(.blue)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                        }
+                                    }
+                                }
+                            }
+
                             Spacer()
+
                             Button(role: .destructive) {
-                                subtasks.remove(at: index)
+                                subtasks.removeAll { $0.id == item.id }
                             } label: {
                                 Image(systemName: "trash")
                                     .foregroundColor(.red.opacity(0.8))
                                     .font(.system(size: 12))
                             }
                             .buttonStyle(.plain)
+                            .padding(.top, 2)
                         }
+                        .padding(.vertical, 2)
                     }
 
-                    HStack {
-                        TextField(L10n.Tasks.addSubtaskPlaceholder, text: $newSubtaskText)
-                            .font(.system(size: 14))
-                            .onSubmit {
-                                addSubtask()
-                            }
-                        if !newSubtaskText.trimmingCharacters(in: .whitespaces).isEmpty {
-                            Button(action: addSubtask) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(AppColors.primary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            TextField(L10n.Tasks.addSubtaskPlaceholder, text: $newSubtaskTitle)
+                                .font(.system(size: 14))
+                                .onSubmit {
+                                    if canAddSubtask {
+                                        addSubtask()
+                                    }
+                                }
+
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isShowingSubtaskDetails.toggle()
+                                }
+                            }) {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(isShowingSubtaskDetails ? AppColors.primary : .secondary)
+                                    .frame(width: 32, height: 32)
+                                    .background(isShowingSubtaskDetails ? AppColors.primary.opacity(0.12) : Color(.secondarySystemGroupedBackground))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(isShowingSubtaskDetails ? AppColors.primary.opacity(0.3) : Color.secondary.opacity(0.15), lineWidth: 1)
+                                    )
                             }
                             .buttonStyle(.plain)
+
+                            if !newSubtaskTitle.trimmingCharacters(in: .whitespaces).isEmpty {
+                                Button(action: addSubtask) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(canAddSubtask ? AppColors.primary : Color.secondary.opacity(0.3))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(!canAddSubtask)
+                            }
+                        }
+
+                        if isShowingSubtaskDetails {
+                            VStack(alignment: .leading, spacing: 8) {
+                                TextField(L10n.Tasks.subtaskDescriptionPlaceholder, text: $newSubtaskDescription, axis: .vertical)
+                                    .font(.system(size: 12))
+                                    .lineLimit(2...3)
+                                    .textFieldStyle(.plain)
+                                    .padding(8)
+                                    .background(Color(.secondarySystemGroupedBackground))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+                                    )
+
+                                if !isRecurring {
+                                    Toggle(isOn: $hasSubtaskDueDate.animation()) {
+                                        Label(L10n.Tasks.subtaskDueDate, systemImage: "calendar")
+                                            .font(.system(size: 12, weight: .medium))
+                                    }
+                                    .tint(AppColors.primary)
+
+                                    if hasSubtaskDueDate {
+                                        DatePicker(
+                                            "",
+                                            selection: $newSubtaskDueDate,
+                                            displayedComponents: [.date, .hourAndMinute]
+                                        )
+                                        .datePickerStyle(.compact)
+                                        .labelsHidden()
+
+                                        if isSubtaskExceedingParentDueDate {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "exclamationmark.triangle.fill")
+                                                    .font(.system(size: 10))
+                                                Text(L10n.Tasks.subtaskDueDateExceeds)
+                                                    .font(.system(size: 10))
+                                            }
+                                            .foregroundColor(AppColors.priorityUrgent)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(10)
+                            .background(Color(.secondarySystemGroupedBackground).opacity(0.6))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                            )
                         }
                     }
                 }
@@ -1224,10 +1356,26 @@ public struct CreateTaskSheet: View {
     }
 
     private func addSubtask() {
-        let text = newSubtaskText.trimmingCharacters(in: .whitespaces)
-        guard !text.isEmpty else { return }
-        subtasks.append(text)
-        newSubtaskText = ""
+        let trimmedTitle = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else { return }
+        if isSubtaskExceedingParentDueDate {
+            errorMessage = L10n.Tasks.subtaskDueDateExceeds
+            return
+        }
+        let trimmedDesc = newSubtaskDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        let descParam = trimmedDesc.isEmpty ? nil : trimmedDesc
+        let dueParam = (!isRecurring && hasSubtaskDueDate) ? DateTimeHelper.toISOString(newSubtaskDueDate) : nil
+
+        let item = CreateTaskSubtaskItem(
+            title: trimmedTitle,
+            description: descParam,
+            dueDate: dueParam
+        )
+        subtasks.append(item)
+        newSubtaskTitle = ""
+        newSubtaskDescription = ""
+        hasSubtaskDueDate = false
+        isShowingSubtaskDetails = false
     }
 
     private func parseTags(_ input: String) -> [String] {
@@ -1252,9 +1400,22 @@ public struct CreateTaskSheet: View {
         }
 
         var finalSubtasks = subtasks
-        let pendingSubtask = newSubtaskText.trimmingCharacters(in: .whitespaces)
-        if !pendingSubtask.isEmpty {
-            finalSubtasks.append(pendingSubtask)
+        let pendingTitle = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !pendingTitle.isEmpty {
+            if isSubtaskExceedingParentDueDate {
+                errorMessage = L10n.Tasks.subtaskDueDateExceeds
+                isSubmitting = false
+                return
+            }
+            let trimmedDesc = newSubtaskDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            let descParam = trimmedDesc.isEmpty ? nil : trimmedDesc
+            let dueParam = (!isRecurring && hasSubtaskDueDate) ? DateTimeHelper.toISOString(newSubtaskDueDate) : nil
+
+            finalSubtasks.append(CreateTaskSubtaskItem(
+                title: pendingTitle,
+                description: descParam,
+                dueDate: dueParam
+            ))
         }
 
         Task {

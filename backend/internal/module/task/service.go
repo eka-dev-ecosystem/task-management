@@ -125,8 +125,9 @@ func (s *service) Create(ctx context.Context, userID string, req CreateTaskReque
 			subItems := make([]CreateRecurringSubtaskItem, len(req.Subtasks))
 			for i, s := range req.Subtasks {
 				subItems[i] = CreateRecurringSubtaskItem{
-					Title:      s,
-					OrderIndex: i,
+					Title:       s.Title,
+					Description: s.Description,
+					OrderIndex:  i,
 				}
 			}
 			var dueTime *string
@@ -913,6 +914,14 @@ func (s *service) CreateFromNote(ctx context.Context, userID string, noteID int6
 	if priority == "" {
 		priority = "medium"
 	}
+	subtasks := make([]CreateTaskSubtaskItem, 0, len(req.Subtasks))
+	for _, st := range req.Subtasks {
+		if strings.TrimSpace(st) != "" {
+			subtasks = append(subtasks, CreateTaskSubtaskItem{
+				Title: strings.TrimSpace(st),
+			})
+		}
+	}
 	res, err := s.Create(ctx, userID, CreateTaskRequest{
 		Title:        title,
 		Description:  content,
@@ -920,7 +929,7 @@ func (s *service) CreateFromNote(ctx context.Context, userID string, noteID int6
 		Priority:     priority,
 		DueDate:      req.DueDate,
 		SourceNoteID: &noteID,
-		Subtasks:     req.Subtasks,
+		Subtasks:     subtasks,
 		ProjectID:    req.ProjectID,
 	})
 	if err != nil {

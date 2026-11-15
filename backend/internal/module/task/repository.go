@@ -263,23 +263,23 @@ func (r *repository) Create(ctx context.Context, tx *sqlx.Tx, userID string, req
 	}
 
 	if len(req.Subtasks) > 0 {
-		var validTitles []string
-		for _, stTitle := range req.Subtasks {
-			if strings.TrimSpace(stTitle) != "" {
-				validTitles = append(validTitles, stTitle)
+		var validSubtasks []CreateTaskSubtaskItem
+		for _, st := range req.Subtasks {
+			if strings.TrimSpace(st.Title) != "" {
+				validSubtasks = append(validSubtasks, st)
 			}
 		}
-		if len(validTitles) > 0 {
+		if len(validSubtasks) > 0 {
 			var valueStrings []string
 			var valueArgs []interface{}
 			argIdx := 1
-			for i, stTitle := range validTitles {
-				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, '', FALSE, FALSE, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2))
-				valueArgs = append(valueArgs, entity.ID, stTitle, i)
-				argIdx += 3
+			for i, st := range validSubtasks {
+				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, FALSE, FALSE, $%d, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3, argIdx+4))
+				valueArgs = append(valueArgs, entity.ID, strings.TrimSpace(st.Title), strings.TrimSpace(st.Description), i, st.DueDate)
+				argIdx += 5
 			}
 			batchQuery := fmt.Sprintf(`
-				INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, order_index, created_at, updated_at)
+				INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at)
 				VALUES %s
 				RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at
 			`, strings.Join(valueStrings, ", "))

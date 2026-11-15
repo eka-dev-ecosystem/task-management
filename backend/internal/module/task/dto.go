@@ -51,23 +51,30 @@ type SubtaskResponse struct {
 	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
 }
 
+// CreateTaskSubtaskItem describes a subtask in a task creation request.
+type CreateTaskSubtaskItem struct {
+	Title       string     `json:"title" validate:"required,min=1,max=255"`
+	Description string     `json:"description"`
+	DueDate     *time.Time `json:"due_date"`
+}
+
 // CreateTaskRequest payload for creating a new task.
 type CreateTaskRequest struct {
-	Title              string     `json:"title" validate:"required,min=1,max=255"`
-	Description        string     `json:"description"`
-	Status             string     `json:"status" validate:"omitempty,oneof=backlog todo in_progress review done"`
-	Priority           string     `json:"priority" validate:"omitempty,oneof=low medium high urgent"`
-	DueDate            *time.Time `json:"due_date"`
-	IsFocus            bool       `json:"is_focus"`
-	Tags               []string   `json:"tags"`
-	ProjectID          *int64     `json:"project_id"`
-	SourceNoteID       *int64     `json:"source_note_id"`
-	Subtasks           []string   `json:"subtasks"`
-	IsRecurring        bool       `json:"is_recurring"`
-	RecurrencePattern  string     `json:"recurrence_pattern" validate:"omitempty,oneof=daily weekdays weekly monthly"`
-	RecurrenceInterval int        `json:"recurrence_interval" validate:"omitempty,min=1,max=365"`
-	RecurrenceEndDate  *time.Time `json:"recurrence_end_date"`
-	RecurringTaskID    *int64     `json:"recurring_task_id"`
+	Title              string                  `json:"title" validate:"required,min=1,max=255"`
+	Description        string                  `json:"description"`
+	Status             string                  `json:"status" validate:"omitempty,oneof=backlog todo in_progress review done"`
+	Priority           string                  `json:"priority" validate:"omitempty,oneof=low medium high urgent"`
+	DueDate            *time.Time              `json:"due_date"`
+	IsFocus            bool                    `json:"is_focus"`
+	Tags               []string                `json:"tags"`
+	ProjectID          *int64                  `json:"project_id"`
+	SourceNoteID       *int64                  `json:"source_note_id"`
+	Subtasks           []CreateTaskSubtaskItem `json:"subtasks"`
+	IsRecurring        bool                    `json:"is_recurring"`
+	RecurrencePattern  string                  `json:"recurrence_pattern" validate:"omitempty,oneof=daily weekdays weekly monthly"`
+	RecurrenceInterval int                     `json:"recurrence_interval" validate:"omitempty,min=1,max=365"`
+	RecurrenceEndDate  *time.Time              `json:"recurrence_end_date"`
+	RecurringTaskID    *int64                  `json:"recurring_task_id"`
 }
 
 func (c *CreateTaskRequest) UnmarshalJSON(data []byte) error {
@@ -80,7 +87,6 @@ func (c *CreateTaskRequest) UnmarshalJSON(data []byte) error {
 		Tags               []string `json:"tags"`
 		ProjectID          *int64   `json:"project_id"`
 		SourceNoteID       *int64   `json:"source_note_id"`
-		Subtasks           []string `json:"subtasks"`
 		IsRecurring        bool     `json:"is_recurring"`
 		RecurrencePattern  string   `json:"recurrence_pattern" validate:"omitempty,oneof=daily weekdays weekly monthly"`
 		RecurrenceInterval int      `json:"recurrence_interval" validate:"omitempty,min=1,max=365"`
@@ -98,7 +104,6 @@ func (c *CreateTaskRequest) UnmarshalJSON(data []byte) error {
 	c.Tags = aux.Tags
 	c.ProjectID = aux.ProjectID
 	c.SourceNoteID = aux.SourceNoteID
-	c.Subtasks = aux.Subtasks
 	c.IsRecurring = aux.IsRecurring
 	c.RecurrencePattern = aux.RecurrencePattern
 	c.RecurrenceInterval = aux.RecurrenceInterval
@@ -123,6 +128,38 @@ func (c *CreateTaskRequest) UnmarshalJSON(data []byte) error {
 				return err
 			}
 			c.RecurrenceEndDate = t
+		}
+		if rawSubtasks, exists := raw["subtasks"]; exists && rawSubtasks != nil {
+			if list, ok := rawSubtasks.([]interface{}); ok {
+				var items []CreateTaskSubtaskItem
+				for _, item := range list {
+					switch v := item.(type) {
+					case string:
+						trimmed := strings.TrimSpace(v)
+						if trimmed != "" {
+							items = append(items, CreateTaskSubtaskItem{Title: trimmed})
+						}
+					case map[string]interface{}:
+						var stItem CreateTaskSubtaskItem
+						if tVal, ok := v["title"].(string); ok {
+							stItem.Title = strings.TrimSpace(tVal)
+						}
+						if dVal, ok := v["description"].(string); ok {
+							stItem.Description = strings.TrimSpace(dVal)
+						}
+						if ddVal, ok := v["due_date"]; ok && ddVal != nil {
+							t, _, err := parseFlexibleTime(ddVal)
+							if err == nil {
+								stItem.DueDate = t
+							}
+						}
+						if stItem.Title != "" {
+							items = append(items, stItem)
+						}
+					}
+				}
+				c.Subtasks = items
+			}
 		}
 	}
 	return nil

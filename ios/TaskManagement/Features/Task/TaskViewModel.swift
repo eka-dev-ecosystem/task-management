@@ -430,7 +430,7 @@ public final class TaskViewModel {
         isFocus: Bool = false,
         tags: [String] = [],
         projectId: Int64? = nil,
-        subtasks: [String] = [],
+        subtasks: [CreateTaskSubtaskItem] = [],
         isRecurring: Bool = false,
         recurrencePattern: String? = nil,
         recurrenceInterval: Int? = nil,
@@ -464,6 +464,39 @@ public final class TaskViewModel {
             self.errorMessage = L10n.Errors.message(for: error)
             return false
         }
+    }
+
+    @MainActor
+    public func createTask(
+        title: String,
+        description: String = "",
+        status: String = "todo",
+        priority: String = "medium",
+        dueDate: String? = nil,
+        isFocus: Bool = false,
+        tags: [String] = [],
+        projectId: Int64? = nil,
+        subtaskTitles: [String],
+        isRecurring: Bool = false,
+        recurrencePattern: String? = nil,
+        recurrenceInterval: Int? = nil,
+        recurrenceEndDate: String? = nil
+    ) async -> Bool {
+        await createTask(
+            title: title,
+            description: description,
+            status: status,
+            priority: priority,
+            dueDate: dueDate,
+            isFocus: isFocus,
+            tags: tags,
+            projectId: projectId,
+            subtasks: subtaskTitles.map { CreateTaskSubtaskItem(title: $0) },
+            isRecurring: isRecurring,
+            recurrencePattern: recurrencePattern,
+            recurrenceInterval: recurrenceInterval,
+            recurrenceEndDate: recurrenceEndDate
+        )
     }
 
     @MainActor

@@ -449,6 +449,45 @@ public struct TaskCursorResponse: Codable {
     }
 }
 
+public struct CreateTaskSubtaskItem: Codable, Identifiable, Sendable, Equatable {
+    public var id: UUID
+    public var title: String
+    public var description: String?
+    public var dueDate: String?
+
+    public init(
+        id: UUID = UUID(),
+        title: String,
+        description: String? = nil,
+        dueDate: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.dueDate = dueDate
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case title, description
+        case dueDate = "due_date"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = UUID()
+        self.title = try container.decode(String.self, forKey: .title)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(title, forKey: .title)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(dueDate, forKey: .dueDate)
+    }
+}
+
 public struct CreateTaskRequest: Codable {
     public let title: String
     public let description: String
@@ -458,7 +497,7 @@ public struct CreateTaskRequest: Codable {
     public let isFocus: Bool
     public let tags: [String]
     public let projectId: Int64?
-    public let subtasks: [String]
+    public let subtasks: [CreateTaskSubtaskItem]
     public let isRecurring: Bool
     public let recurrencePattern: String?
     public let recurrenceInterval: Int?
@@ -473,7 +512,7 @@ public struct CreateTaskRequest: Codable {
         isFocus: Bool = false,
         tags: [String] = [],
         projectId: Int64? = nil,
-        subtasks: [String] = [],
+        subtasks: [CreateTaskSubtaskItem] = [],
         isRecurring: Bool = false,
         recurrencePattern: String? = nil,
         recurrenceInterval: Int? = nil,
@@ -492,6 +531,38 @@ public struct CreateTaskRequest: Codable {
         self.recurrencePattern = recurrencePattern
         self.recurrenceInterval = recurrenceInterval
         self.recurrenceEndDate = recurrenceEndDate
+    }
+
+    public init(
+        title: String,
+        description: String = "",
+        status: String = "todo",
+        priority: String = "medium",
+        dueDate: String? = nil,
+        isFocus: Bool = false,
+        tags: [String] = [],
+        projectId: Int64? = nil,
+        subtaskTitles: [String],
+        isRecurring: Bool = false,
+        recurrencePattern: String? = nil,
+        recurrenceInterval: Int? = nil,
+        recurrenceEndDate: String? = nil
+    ) {
+        self.init(
+            title: title,
+            description: description,
+            status: status,
+            priority: priority,
+            dueDate: dueDate,
+            isFocus: isFocus,
+            tags: tags,
+            projectId: projectId,
+            subtasks: subtaskTitles.map { CreateTaskSubtaskItem(title: $0) },
+            isRecurring: isRecurring,
+            recurrencePattern: recurrencePattern,
+            recurrenceInterval: recurrenceInterval,
+            recurrenceEndDate: recurrenceEndDate
+        )
     }
 
     enum CodingKeys: String, CodingKey {
