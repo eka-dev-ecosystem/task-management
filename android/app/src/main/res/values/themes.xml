@@ -2,7 +2,7 @@
 <resources>
     <!-- Base application theme (Modern Dark Theme for Task Hub) -->
     <style name="Theme.TaskHub" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:windowBackground">@drawable/launch_background</item>
         <item name="android:statusBarColor">@color/background_dark</item>
         <item name="android:navigationBarColor">@color/background_dark</item>
         <item name="android:windowLightStatusBar">false</item>
