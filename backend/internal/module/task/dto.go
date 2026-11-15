@@ -711,9 +711,14 @@ func (u *UpdateRecurringTaskRequest) UnmarshalJSON(data []byte) error {
 			if val == nil {
 				u.DueTime = nil
 				u.ClearDueTime = true
-			} else if s, ok := val.(string); ok && strings.TrimSpace(s) == "" {
-				u.DueTime = nil
-				u.ClearDueTime = true
+			} else if s, ok := val.(string); ok {
+				s = strings.TrimSpace(s)
+				if s == "" || s == "0000-" || s == "0000-:00" {
+					u.DueTime = nil
+					u.ClearDueTime = true
+				} else {
+					u.DueTime = &s
+				}
 			}
 		}
 		if u.ClearDueTime {

@@ -563,8 +563,36 @@ fun TaskListScreen(
 }
 
 // ==========================================
-// Recurring Task Card
+// Recurring Task Card & Due Time Helper
 // ==========================================
+
+fun formatDueTimeDisplay(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    val trimmed = raw.trim()
+    if (trimmed.startsWith("0000-")) {
+        if (trimmed.contains("T")) {
+            val timePart = trimmed.substringAfter("T").removeSuffix("Z").trim()
+            if (timePart.length >= 5) return timePart.substring(0, 5)
+        }
+        if (trimmed.contains(" ")) {
+            val timePart = trimmed.substringAfter(" ").trim()
+            if (timePart.length >= 5) return timePart.substring(0, 5)
+        }
+        return null
+    }
+    if (trimmed.contains("T")) {
+        val timePart = trimmed.substringAfter("T").removeSuffix("Z").trim()
+        if (timePart.length >= 5) return timePart.substring(0, 5)
+    }
+    if (trimmed.contains(" ")) {
+        val timePart = trimmed.substringAfter(" ").trim()
+        if (timePart.length >= 5) return timePart.substring(0, 5)
+    }
+    if (trimmed.length >= 5 && trimmed.contains(":")) {
+        return trimmed.substring(0, 5)
+    }
+    return null
+}
 
 @Composable
 fun RecurringTaskCard(
@@ -615,8 +643,8 @@ fun RecurringTaskCard(
                 }
 
                 // Due Time Badge (Formatted as HH:mm)
-                if (!item.dueTime.isNullOrBlank()) {
-                    val formattedTime = if (item.dueTime.length >= 5) item.dueTime.substring(0, 5) else item.dueTime
+                val cleanDueTime = formatDueTimeDisplay(item.dueTime)
+                if (cleanDueTime != null) {
                     Surface(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                         shape = RoundedCornerShape(12.dp)
@@ -627,7 +655,7 @@ fun RecurringTaskCard(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(formattedTime, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(cleanDueTime, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -1351,7 +1379,7 @@ fun CreateRecurringTaskDialog(
                         projectId = selectedProjectId,
                         recurrencePattern = recurrencePattern,
                         recurrenceInterval = recurrenceInterval,
-                        dueTime = if (hasDueTime) (if (dueTime.length == 5) "$dueTime:00" else dueTime) else null,
+                        dueTime = if (hasDueTime && dueTime.isNotBlank() && !dueTime.startsWith("0000-")) (if (dueTime.length == 5) "$dueTime:00" else dueTime) else null,
                         isActive = true,
                         subtasks = subtaskItems
                     )
@@ -1388,11 +1416,10 @@ fun EditRecurringTaskDialog(
     var recurrenceInterval by remember { mutableStateOf(item.recurrenceInterval) }
     var isActive by remember { mutableStateOf(item.isActive) }
 
-    var hasDueTime by remember { mutableStateOf(!item.dueTime.isNullOrBlank()) }
+    val cleanParsedTime = formatDueTimeDisplay(item.dueTime)
+    var hasDueTime by remember { mutableStateOf(cleanParsedTime != null) }
     var dueTime by remember {
-        mutableStateOf(
-            if (!item.dueTime.isNullOrBlank() && item.dueTime.length >= 5) item.dueTime.substring(0, 5) else "09:00"
-        )
+        mutableStateOf(cleanParsedTime ?: "09:00")
     }
 
     val subtasks = remember {
@@ -1637,7 +1664,7 @@ fun EditRecurringTaskDialog(
                         clearProjectId = selectedProjectId == null,
                         recurrencePattern = recurrencePattern,
                         recurrenceInterval = recurrenceInterval,
-                        dueTime = if (hasDueTime) (if (dueTime.length == 5) "$dueTime:00" else dueTime) else null,
+                        dueTime = if (hasDueTime && dueTime.isNotBlank() && !dueTime.startsWith("0000-")) (if (dueTime.length == 5) "$dueTime:00" else dueTime) else null,
                         clearDueTime = !hasDueTime,
                         isActive = isActive,
                         subtasks = subtaskItems

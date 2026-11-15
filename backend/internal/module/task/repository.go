@@ -175,10 +175,105 @@ type recurringTaskEntity struct {
 	UpdatedAt          time.Time  `db:"updated_at"`
 }
 
+func cleanDueTimeString(dt *string) *string {
+	if dt == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*dt)
+	if s == "" || s == "0000-" || s == "0000-:00" {
+		return nil
+	}
+	if strings.Contains(s, "T") {
+		parts := strings.Split(s, "T")
+		if len(parts) > 1 {
+			timePart := strings.TrimSuffix(parts[1], "Z")
+			timePart = strings.TrimSpace(timePart)
+			if len(timePart) >= 5 {
+				if len(timePart) >= 8 {
+					res := timePart[:8]
+					return &res
+				}
+				res := timePart[:5] + ":00"
+				return &res
+			}
+		}
+	} else if strings.Contains(s, " ") {
+		parts := strings.Split(s, " ")
+		if len(parts) > 1 {
+			timePart := strings.TrimSpace(parts[1])
+			if len(timePart) >= 5 {
+				if len(timePart) >= 8 {
+					res := timePart[:8]
+					return &res
+				}
+				res := timePart[:5] + ":00"
+				return &res
+			}
+		}
+	}
+	if strings.HasPrefix(s, "0000-") {
+		return nil
+	}
+	if len(s) == 5 && strings.Count(s, ":") == 1 {
+		res := s + ":00"
+		return &res
+	}
+	if len(s) >= 8 && strings.Count(s, ":") >= 2 {
+		res := s[:8]
+		return &res
+	}
+	return &s
+}
+
+func sanitizeDueTimeForDB(dt *string) *string {
+	if dt == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*dt)
+	if s == "" || s == "null" || s == "0000-" || s == "0000-:00" {
+		return nil
+	}
+	if strings.HasPrefix(s, "0000-") {
+		if strings.Contains(s, "T") {
+			parts := strings.Split(s, "T")
+			if len(parts) > 1 {
+				timePart := strings.TrimSuffix(parts[1], "Z")
+				timePart = strings.TrimSpace(timePart)
+				if len(timePart) >= 5 {
+					if len(timePart) >= 8 {
+						res := timePart[:8]
+						return &res
+					}
+					res := timePart[:5] + ":00"
+					return &res
+				}
+			}
+		}
+		return nil
+	}
+	if len(s) == 5 && strings.Count(s, ":") == 1 {
+		res := s + ":00"
+		return &res
+	}
+	if len(s) >= 8 && strings.Count(s, ":") >= 2 {
+		res := s[:8]
+		return &res
+	}
+	if _, err := time.Parse("15:04:05", s); err == nil {
+		return &s
+	}
+	if _, err := time.Parse("15:04", s); err == nil {
+		res := s + ":00"
+		return &res
+	}
+	return nil
+}
+
 func (e *recurringTaskEntity) toResponse(subtasks []RecurringSubtaskResponse) RecurringTaskResponse {
 	if subtasks == nil {
 		subtasks = []RecurringSubtaskResponse{}
 	}
+	cleanTime := cleanDueTimeString(e.DueTime)
 	return RecurringTaskResponse{
 		ID:                 e.ID,
 		UserID:             e.UserID,
@@ -190,7 +285,7 @@ func (e *recurringTaskEntity) toResponse(subtasks []RecurringSubtaskResponse) Re
 		Priority:           e.Priority,
 		RecurrencePattern:  e.RecurrencePattern,
 		RecurrenceInterval: e.RecurrenceInterval,
-		DueTime:            e.DueTime,
+		DueTime:            cleanTime,
 		RecurrenceEndDate:  e.RecurrenceEndDate,
 		IsActive:           e.IsActive,
 		LastGeneratedAt:    e.LastGeneratedAt,
@@ -1217,7 +1312,7 @@ func (r *repository) FindRecurringByID(ctx context.Context, tx *sqlx.Tx, userID 
 		SELECT 
 			rt.id, rt.user_id, rt.project_id, p.name as project_name, p.color as project_color,
 			rt.title, rt.description, rt.priority, rt.recurrence_pattern, rt.recurrence_interval,
-			rt.due_time, rt.recurrence_end_date, rt.is_active, rt.last_generated_at,
+			to_char(rt.due_time, 'HH24:MI:SS') as due_time, rt.recurrence_end_date, rt.is_active, rt.last_generated_at,
 			rt.created_at, rt.updated_at
 		FROM recurring_tasks rt
 		LEFT JOIN projects p ON p.id = rt.project_id
@@ -1244,7 +1339,7 @@ func (r *repository) FindRecurringByIDSystem(ctx context.Context, tx *sqlx.Tx, i
 		SELECT 
 			rt.id, rt.user_id, rt.project_id, p.name as project_name, p.color as project_color,
 			rt.title, rt.description, rt.priority, rt.recurrence_pattern, rt.recurrence_interval,
-			rt.due_time, rt.recurrence_end_date, rt.is_active, rt.last_generated_at,
+			to_char(rt.due_time, 'HH24:MI:SS') as due_time, rt.recurrence_end_date, rt.is_active, rt.last_generated_at,
 			rt.created_at, rt.updated_at,
 			u.timezone
 		FROM recurring_tasks rt
@@ -1282,7 +1377,7 @@ func (r *repository) FindAllRecurring(ctx context.Context, tx *sqlx.Tx, userID s
 		SELECT 
 			rt.id, rt.user_id, rt.project_id, p.name as project_name, p.color as project_color,
 			rt.title, rt.description, rt.priority, rt.recurrence_pattern, rt.recurrence_interval,
-			rt.due_time, rt.recurrence_end_date, rt.is_active, rt.last_generated_at,
+			to_char(rt.due_time, 'HH24:MI:SS') as due_time, rt.recurrence_end_date, rt.is_active, rt.last_generated_at,
 			rt.created_at, rt.updated_at
 		FROM recurring_tasks rt
 		LEFT JOIN projects p ON p.id = rt.project_id
@@ -1319,6 +1414,8 @@ func (r *repository) CreateRecurring(ctx context.Context, tx *sqlx.Tx, userID st
 		priority = "medium"
 	}
 
+	dueTime := sanitizeDueTimeForDB(req.DueTime)
+
 	query := `
 		INSERT INTO recurring_tasks (
 			user_id, project_id, title, description, priority,
@@ -1327,11 +1424,11 @@ func (r *repository) CreateRecurring(ctx context.Context, tx *sqlx.Tx, userID st
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NULL, NOW(), NOW())
 		RETURNING id, user_id, project_id, title, description, priority,
-			recurrence_pattern, recurrence_interval, due_time, recurrence_end_date,
+			recurrence_pattern, recurrence_interval, to_char(due_time, 'HH24:MI:SS') as due_time, recurrence_end_date,
 			is_active, last_generated_at, created_at, updated_at
 	`
 	var entity recurringTaskEntity
-	err := tx.QueryRowxContext(ctx, query, userID, req.ProjectID, req.Title, req.Description, priority, pattern, interval, req.DueTime, req.RecurrenceEndDate).StructScan(&entity)
+	err := tx.QueryRowxContext(ctx, query, userID, req.ProjectID, req.Title, req.Description, priority, pattern, interval, dueTime, req.RecurrenceEndDate).StructScan(&entity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create recurring task: %w", err)
 	}
@@ -1411,13 +1508,13 @@ func (r *repository) UpdateRecurring(ctx context.Context, tx *sqlx.Tx, userID st
 	if interval <= 0 {
 		interval = 1
 	}
-	dueTime := existing.DueTime
+	dueTime := sanitizeDueTimeForDB(existing.DueTime)
 	if req.ClearDueTime {
 		dueTime = nil
 	} else if req.HasDueTime {
-		dueTime = req.DueTime
+		dueTime = sanitizeDueTimeForDB(req.DueTime)
 	} else if req.DueTime != nil {
-		dueTime = req.DueTime
+		dueTime = sanitizeDueTimeForDB(req.DueTime)
 	}
 	endDate := existing.RecurrenceEndDate
 	if req.ClearRecurrenceEndDate {
@@ -1453,7 +1550,7 @@ func (r *repository) UpdateRecurring(ctx context.Context, tx *sqlx.Tx, userID st
 			recurrence_end_date = $8, is_active = $9, updated_at = NOW()
 		WHERE id = $10 AND user_id = $11
 		RETURNING id, user_id, project_id, title, description, priority,
-			recurrence_pattern, recurrence_interval, due_time, recurrence_end_date,
+			recurrence_pattern, recurrence_interval, to_char(due_time, 'HH24:MI:SS') as due_time, recurrence_end_date,
 			is_active, last_generated_at, created_at, updated_at
 	`
 	var entity recurringTaskEntity
@@ -1524,7 +1621,7 @@ func (r *repository) ToggleActiveRecurring(ctx context.Context, tx *sqlx.Tx, use
 		SET is_active = NOT is_active, updated_at = NOW()
 		WHERE id = $1 AND user_id = $2
 		RETURNING id, user_id, project_id, title, description, priority,
-			recurrence_pattern, recurrence_interval, due_time, recurrence_end_date,
+			recurrence_pattern, recurrence_interval, to_char(due_time, 'HH24:MI:SS') as due_time, recurrence_end_date,
 			is_active, last_generated_at, created_at, updated_at
 	`
 	var entity recurringTaskEntity
@@ -1775,7 +1872,7 @@ func (r *repository) ConvertTaskToRecurring(ctx context.Context, tx *sqlx.Tx, us
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), NOW())
 		RETURNING id, user_id, project_id, title, description, priority,
-			recurrence_pattern, recurrence_interval, due_time, recurrence_end_date,
+			recurrence_pattern, recurrence_interval, to_char(due_time, 'HH24:MI:SS') as due_time, recurrence_end_date,
 			is_active, last_generated_at, created_at, updated_at
 	`
 	var entity recurringTaskEntity

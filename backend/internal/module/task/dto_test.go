@@ -2,6 +2,7 @@ package task
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -157,6 +158,18 @@ func TestUpdateRecurringTaskRequest_UnmarshalJSON(t *testing.T) {
 		assert.True(t, req.HasDueTime)
 		assert.True(t, req.ClearDueTime)
 		assert.Nil(t, req.DueTime)
+	})
+
+	t.Run("corrupted 0000- or 0000-:00 due_time sets ClearDueTime and HasDueTime", func(t *testing.T) {
+		for _, invalidStr := range []string{"0000-", "0000-:00"} {
+			body := fmt.Sprintf(`{"due_time": "%s"}`, invalidStr)
+			var req UpdateRecurringTaskRequest
+			err := json.Unmarshal([]byte(body), &req)
+			require.NoError(t, err)
+			assert.True(t, req.HasDueTime)
+			assert.True(t, req.ClearDueTime)
+			assert.Nil(t, req.DueTime)
+		}
 	})
 
 	t.Run("null project_id sets ClearProjectID and HasProjectID", func(t *testing.T) {

@@ -1604,6 +1604,54 @@ struct RecurringTasksView: View {
     }
 }
 
+// MARK: - Recurring Due Time Helper
+public func parseDueTimeString(_ raw: String?) -> String? {
+    guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+    if raw.hasPrefix("0000-") {
+        if raw.contains("T") {
+            let parts = raw.split(separator: "T")
+            if parts.count > 1 {
+                let timePart = parts[1].replacingOccurrences(of: "Z", with: "").trimmingCharacters(in: .whitespaces)
+                if timePart.count >= 5 {
+                    return String(timePart.prefix(5))
+                }
+            }
+        }
+        if raw.contains(" ") {
+            let parts = raw.split(separator: " ")
+            if parts.count > 1 {
+                let timePart = parts[1].trimmingCharacters(in: .whitespaces)
+                if timePart.count >= 5 {
+                    return String(timePart.prefix(5))
+                }
+            }
+        }
+        return nil
+    }
+    if raw.contains("T") {
+        let parts = raw.split(separator: "T")
+        if parts.count > 1 {
+            let timePart = parts[1].replacingOccurrences(of: "Z", with: "").trimmingCharacters(in: .whitespaces)
+            if timePart.count >= 5 {
+                return String(timePart.prefix(5))
+            }
+        }
+    }
+    if raw.contains(" ") {
+        let parts = raw.split(separator: " ")
+        if parts.count > 1 {
+            let timePart = parts[1].trimmingCharacters(in: .whitespaces)
+            if timePart.count >= 5 {
+                return String(timePart.prefix(5))
+            }
+        }
+    }
+    if raw.count >= 5 && raw.contains(":") {
+        return String(raw.prefix(5))
+    }
+    return nil
+}
+
 // MARK: - Recurring Task Card View
 struct RecurringTaskCardView: View {
     let item: RecurringTaskItem
@@ -1651,8 +1699,7 @@ struct RecurringTaskCardView: View {
                 .clipShape(Capsule())
 
                 // Due Time Badge (if set)
-                if let dueTime = item.dueTime, !dueTime.isEmpty {
-                    let formattedTime = dueTime.count >= 5 ? String(dueTime.prefix(5)) : dueTime
+                if let formattedTime = parseDueTimeString(item.dueTime) {
                     HStack(spacing: 3) {
                         Image(systemName: "clock")
                             .font(.system(size: 10))
@@ -2012,11 +2059,10 @@ struct EditRecurringTaskSheet: View {
         _recurrenceInterval = State(initialValue: item.recurrenceInterval)
         _isActive = State(initialValue: item.isActive)
 
-        if let dt = item.dueTime, !dt.isEmpty {
+        if let cleanTime = parseDueTimeString(item.dueTime) {
             let df = DateFormatter()
             df.dateFormat = "HH:mm"
-            let timeStr = dt.count >= 5 ? String(dt.prefix(5)) : dt
-            if let date = df.date(from: timeStr) {
+            if let date = df.date(from: cleanTime) {
                 _hasDueTime = State(initialValue: true)
                 _dueTimeDate = State(initialValue: date)
             } else {

@@ -1,8 +1,8 @@
 import { confirmDialog } from 'primereact/confirmdialog'
-import { Dialog } from 'primereact/dialog'
 import { InputSwitch } from 'primereact/inputswitch'
 import React, { useMemo, useState } from 'react'
 
+import { getLocalizedErrorMessage } from '@/api'
 import {
   useCreateRecurringTask,
   useDeleteRecurringTask,
@@ -43,6 +43,64 @@ const PRIORITY_META: Record<TaskPriority, { icon: string; class: string; badge: 
   }
 }
 
+/**
+ * Safely parse and format due_time for display (HH:mm)
+ * Prevents corrupted '0000-' or ISO timestamp strings from displaying on cards
+ */
+const formatDueTimeDisplay = (dueTime?: string | null): string => {
+  if (!dueTime) return ''
+  const trimmed = dueTime.trim()
+  if (trimmed.startsWith('0000-')) {
+    if (trimmed.includes('T')) {
+      const timePart = trimmed.split('T')[1]?.replace('Z', '').trim()
+      if (timePart && timePart.length >= 5) {
+        return timePart.substring(0, 5)
+      }
+    }
+    if (trimmed.includes(' ')) {
+      const timePart = trimmed.split(' ')[1]?.trim()
+      if (timePart && timePart.length >= 5) {
+        return timePart.substring(0, 5)
+      }
+    }
+    return ''
+  }
+  if (trimmed.includes('T')) {
+    const timePart = trimmed.split('T')[1]?.replace('Z', '').trim()
+    if (timePart && timePart.length >= 5) {
+      return timePart.substring(0, 5)
+    }
+  }
+  if (trimmed.includes(' ')) {
+    const timePart = trimmed.split(' ')[1]?.trim()
+    if (timePart && timePart.length >= 5) {
+      return timePart.substring(0, 5)
+    }
+  }
+  if (trimmed.length >= 5 && trimmed.includes(':')) {
+    return trimmed.substring(0, 5)
+  }
+  return ''
+}
+
+/**
+ * Sanitize due_time before sending to backend in PUT/POST requests
+ * Returns clean 'HH:mm:ss' or null
+ */
+const cleanPayloadDueTime = (dt: string): string | null => {
+  const trimmed = dt.trim()
+  if (!trimmed || trimmed === 'null' || trimmed.startsWith('0000-')) {
+    return null
+  }
+  if (trimmed.length === 5 && trimmed.includes(':')) {
+    return `${trimmed}:00`
+  }
+  if (trimmed.length >= 8 && trimmed.includes(':')) {
+    return trimmed.substring(0, 8)
+  }
+  return null
+}
+
 export const RecurringTasksManagementView: React.FC = () => {
   const { t } = useTranslation()
   const { data: rawTemplates, isLoading, isError, refetch } = useRecurringTasks()
@@ -73,6 +131,7 @@ export const RecurringTasksManagementView: React.FC = () => {
   const [formSubtasks, setFormSubtasks] = useState<string[]>([])
   const [newSubtaskInput, setNewSubtaskInput] = useState('')
   const [formTouched, setFormTouched] = useState(false)
+  const [formErrorMsg, setFormErrorMsg] = useState<string | null>(null)
 
   const openCreateModal = () => {
     setEditingTemplate(null)
@@ -87,6 +146,7 @@ export const RecurringTasksManagementView: React.FC = () => {
     setFormSubtasks([])
     setNewSubtaskInput('')
     setFormTouched(false)
+    setFormErrorMsg(null)
     setIsModalOpen(true)
   }
 
@@ -98,16 +158,17 @@ export const RecurringTasksManagementView: React.FC = () => {
     setFormProjectId(template.project_id || null)
     setFormPattern(template.recurrence_pattern || 'daily')
     setFormInterval(template.recurrence_interval || 1)
-    setFormDueTime(template.due_time ? template.due_time.substring(0, 5) : '')
+    setFormDueTime(formatDueTimeDisplay(template.due_time))
     setFormIsActive(template.is_active)
     setFormSubtasks(template.subtasks?.map((s) => s.title) || [])
     setNewSubtaskInput('')
     setFormTouched(false)
+    setFormErrorMsg(null)
     setIsModalOpen(true)
   }
 
-  const handleAddSubtask = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleAddSubtask = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     if (!newSubtaskInput.trim()) return
     setFormSubtasks([...formSubtasks, newSubtaskInput.trim()])
     setNewSubtaskInput('')
@@ -120,6 +181,7 @@ export const RecurringTasksManagementView: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormTouched(true)
+    setFormErrorMsg(null)
     if (!formTitle.trim()) return
 
     const subtaskPayload = formSubtasks.map((st, idx) => ({
@@ -127,35 +189,41 @@ export const RecurringTasksManagementView: React.FC = () => {
       order_index: idx
     }))
 
-    if (editingTemplate) {
-      const payload: UpdateRecurringTaskPayload = {
-        title: formTitle.trim(),
-        description: formDesc.trim(),
-        priority: formPriority,
-        project_id: formProjectId,
-        recurrence_pattern: formPattern,
-        recurrence_interval: formInterval,
-        due_time: formDueTime ? (formDueTime.length === 5 ? `${formDueTime}:00` : formDueTime) : null,
-        is_active: formIsActive,
-        subtasks: subtaskPayload
-      }
-      await updateMutation.mutateAsync({ id: editingTemplate.id, payload })
-    } else {
-      const payload: CreateRecurringTaskPayload = {
-        title: formTitle.trim(),
-        description: formDesc.trim(),
-        priority: formPriority,
-        project_id: formProjectId,
-        recurrence_pattern: formPattern,
-        recurrence_interval: formInterval,
-        due_time: formDueTime ? (formDueTime.length === 5 ? `${formDueTime}:00` : formDueTime) : undefined,
-        is_active: formIsActive,
-        subtasks: subtaskPayload
-      }
-      await createMutation.mutateAsync(payload)
-    }
+    const sanitizedDueTime = cleanPayloadDueTime(formDueTime)
 
-    setIsModalOpen(false)
+    try {
+      if (editingTemplate) {
+        const payload: UpdateRecurringTaskPayload = {
+          title: formTitle.trim(),
+          description: formDesc.trim(),
+          priority: formPriority,
+          project_id: formProjectId,
+          recurrence_pattern: formPattern,
+          recurrence_interval: formInterval,
+          due_time: sanitizedDueTime,
+          is_active: formIsActive,
+          subtasks: subtaskPayload
+        }
+        await updateMutation.mutateAsync({ id: editingTemplate.id, payload })
+      } else {
+        const payload: CreateRecurringTaskPayload = {
+          title: formTitle.trim(),
+          description: formDesc.trim(),
+          priority: formPriority,
+          project_id: formProjectId,
+          recurrence_pattern: formPattern,
+          recurrence_interval: formInterval,
+          due_time: sanitizedDueTime || undefined,
+          is_active: formIsActive,
+          subtasks: subtaskPayload
+        }
+        await createMutation.mutateAsync(payload)
+      }
+
+      setIsModalOpen(false)
+    } catch (err) {
+      setFormErrorMsg(getLocalizedErrorMessage(err, t))
+    }
   }
 
   const handleDeleteTemplate = (template: RecurringTask) => {
@@ -421,10 +489,10 @@ export const RecurringTasksManagementView: React.FC = () => {
                         <span>{patternText}</span>
                       </span>
 
-                      {template.due_time && (
+                      {Boolean(formatDueTimeDisplay(template.due_time)) && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
                           <i className="pi pi-clock text-[10px]" />
-                          <span>{template.due_time.substring(0, 5)}</span>
+                          <span>{formatDueTimeDisplay(template.due_time)}</span>
                         </span>
                       )}
 
@@ -470,224 +538,353 @@ export const RecurringTasksManagementView: React.FC = () => {
       </div>
 
       {/* Modal: Create / Edit Template */}
-      <Dialog
-        visible={isModalOpen}
-        onHide={() => setIsModalOpen(false)}
-        header={
-          <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
-            <i className="pi pi-sync text-indigo-500" />
-            <span className="text-sm font-bold">
-              {editingTemplate ? t('recurring.editTemplateTitle') : t('recurring.createTemplateTitle')}
-            </span>
-          </div>
-        }
-        className="w-full max-w-lg mx-4"
-        contentClassName="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-5 rounded-b-xl"
-        headerClassName="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-4 border-b border-slate-200 dark:border-slate-800 rounded-t-xl"
-      >
-        <form onSubmit={handleSave} className="space-y-4 pt-1">
-          {/* Title */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              {t('recurring.form.titleLabel')}
-            </label>
-            <input
-              type="text"
-              value={formTitle}
-              onChange={(e) => setFormTitle(e.target.value)}
-              placeholder={t('recurring.form.titlePlaceholder')}
-              className={`w-full px-3 py-2 rounded-lg border text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors ${
-                formTouched && !formTitle.trim()
-                  ? 'border-rose-500 focus:border-rose-500'
-                  : 'border-slate-200 dark:border-slate-800 focus:border-indigo-500'
-              }`}
-            />
-            {formTouched && !formTitle.trim() && (
-              <span className="text-[11px] text-rose-500 mt-1 block">{t('recurring.form.titleRequired')}</span>
-            )}
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              {t('recurring.form.descriptionLabel')}
-            </label>
-            <textarea
-              rows={2}
-              value={formDesc}
-              onChange={(e) => setFormDesc(e.target.value)}
-              placeholder={t('recurring.form.descriptionPlaceholder')}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
-            />
-          </div>
-
-          {/* Project & Priority */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {t('recurring.form.projectLabel')}
-              </label>
-              <select
-                value={formProjectId ?? ''}
-                onChange={(e) => setFormProjectId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">{t('recurring.form.noProject')}</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {t('recurring.form.priorityLabel')}
-              </label>
-              <select
-                value={formPriority}
-                onChange={(e) => setFormPriority(e.target.value as TaskPriority)}
-                className="w-full px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="low">{t('recurring.form.priorityLow')}</option>
-                <option value="medium">{t('recurring.form.priorityMedium')}</option>
-                <option value="high">{t('recurring.form.priorityHigh')}</option>
-                <option value="urgent">{t('recurring.form.priorityUrgent')}</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Recurrence Pattern & Interval */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {t('recurring.form.patternLabel')}
-              </label>
-              <select
-                value={formPattern}
-                onChange={(e) => setFormPattern(e.target.value as RecurrencePattern)}
-                className="w-full px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="daily">{t('recurring.form.patternDaily')}</option>
-                <option value="weekdays">{t('recurring.form.patternWeekdays')}</option>
-                <option value="weekly">{t('recurring.form.patternWeekly')}</option>
-                <option value="monthly">{t('recurring.form.patternMonthly')}</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {t('recurring.form.intervalLabel')}
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={30}
-                value={formInterval}
-                onChange={(e) => setFormInterval(Math.max(1, Number(e.target.value)))}
-                className="w-full px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-          </div>
-
-          {/* Due Time & Active Status */}
-          <div className="grid grid-cols-2 gap-3 items-center">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {t('recurring.form.dueTimeLabel')}
-              </label>
-              <input
-                type="time"
-                value={formDueTime}
-                onChange={(e) => setFormDueTime(e.target.value)}
-                className="w-full px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div className="pt-4">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300">
-                <InputSwitch
-                  checked={formIsActive}
-                  onChange={(e) => setFormIsActive(Boolean(e.value))}
-                />
-                <span>{t('recurring.form.activeStatusLabel')}</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Checklist Subtasks Template */}
-          <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-              {t('recurring.form.subtasksLabel')}
-            </label>
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newSubtaskInput}
-                onChange={(e) => setNewSubtaskInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleAddSubtask(e)
-                  }
-                }}
-                placeholder={t('recurring.form.subtaskPlaceholder')}
-                className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
-              />
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/45 dark:bg-slate-950/75 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl text-slate-900 dark:text-slate-100 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <i className="pi pi-sync text-sm" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    {editingTemplate ? t('recurring.editTemplateTitle') : t('recurring.createTemplateTitle')}
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {t('recurring.subtitle')}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={handleAddSubtask}
-                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer"
+                onClick={() => setIsModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title={t('common.close') || 'Tutup'}
               >
-                {t('recurring.form.addSubtaskBtn')}
+                <i className="pi pi-times text-xs" />
               </button>
             </div>
 
-            {formSubtasks.length > 0 && (
-              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1 pt-1">
-                {formSubtasks.map((st, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/60 text-xs text-slate-800 dark:text-slate-200"
-                  >
-                    <span className="truncate">{st}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSubtask(idx)}
-                      className="text-slate-400 hover:text-rose-500 cursor-pointer ml-2"
-                    >
-                      <i className="pi pi-times text-[10px]" />
-                    </button>
-                  </div>
-                ))}
+            {/* Error Message Banner */}
+            {formErrorMsg && (
+              <div className="mx-6 mt-4 flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-600 dark:text-rose-400 shrink-0">
+                <i className="pi pi-exclamation-circle text-sm mt-0.5 shrink-0" />
+                <span className="flex-1 font-medium">{formErrorMsg}</span>
+                <button
+                  type="button"
+                  onClick={() => setFormErrorMsg(null)}
+                  className="text-rose-500/70 hover:text-rose-500 cursor-pointer"
+                >
+                  <i className="pi pi-times text-xs" />
+                </button>
               </div>
             )}
-          </div>
 
-          {/* Modal Footer */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(false)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-            >
-              {t('recurring.cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={createMutation.isPending || updateMutation.isPending}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs disabled:opacity-50 cursor-pointer transition-colors"
-            >
-              {(createMutation.isPending || updateMutation.isPending) && (
-                <i className="pi pi-spin pi-spinner text-xs" />
-              )}
-              <span>{t('recurring.save')}</span>
-            </button>
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  {t('recurring.form.titleLabel')} <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={formTitle}
+                  onBlur={() => setFormTouched(true)}
+                  onChange={(e) => {
+                    setFormTitle(e.target.value)
+                    if (formTouched) setFormTouched(true)
+                  }}
+                  placeholder={t('recurring.form.titlePlaceholder')}
+                  className={`w-full rounded-lg border px-3 py-2 text-xs text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-950 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none transition-colors ${
+                    formTouched && !formTitle.trim()
+                      ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30'
+                      : 'border-slate-200 dark:border-slate-800 focus:border-indigo-500'
+                  }`}
+                />
+                {formTouched && !formTitle.trim() && (
+                  <p className="text-[11px] text-rose-500 mt-1 flex items-center gap-1 font-medium">
+                    <i className="pi pi-exclamation-circle text-[10px]" />
+                    {t('recurring.form.titleRequired')}
+                  </p>
+                )}
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                  {t('recurring.form.descriptionLabel')}
+                </label>
+                <textarea
+                  rows={2}
+                  value={formDesc}
+                  onChange={(e) => setFormDesc(e.target.value)}
+                  placeholder={t('recurring.form.descriptionPlaceholder')}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-none resize-none transition-colors"
+                />
+              </div>
+
+              {/* Project & Priority */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    {t('recurring.form.projectLabel')}
+                  </label>
+                  <select
+                    value={formProjectId === null ? '' : String(formProjectId)}
+                    onChange={(e) => setFormProjectId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:border-indigo-500 focus:outline-none transition-colors"
+                  >
+                    <option value="" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                      {t('recurring.form.noProject')}
+                    </option>
+                    {projects.map((p) => (
+                      <option
+                        key={p.id}
+                        value={String(p.id)}
+                        className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                      >
+                        📁 {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    {t('recurring.form.priorityLabel')} <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <select
+                    value={formPriority}
+                    onChange={(e) => setFormPriority(e.target.value as TaskPriority)}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:border-indigo-500 focus:outline-none transition-colors"
+                  >
+                    <option value="low" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                      {t('recurring.form.priorityLow')}
+                    </option>
+                    <option value="medium" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                      {t('recurring.form.priorityMedium')}
+                    </option>
+                    <option value="high" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                      {t('recurring.form.priorityHigh')}
+                    </option>
+                    <option value="urgent" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                      {t('recurring.form.priorityUrgent')}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Recurrence Pattern & Interval Container */}
+              <div className="p-3.5 rounded-xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                      <i className="pi pi-sync text-indigo-500 text-[10px]" />
+                      {t('recurring.form.patternLabel')}
+                    </label>
+                    <select
+                      value={formPattern}
+                      onChange={(e) => setFormPattern(e.target.value as RecurrencePattern)}
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:border-indigo-500 focus:outline-none transition-colors"
+                    >
+                      <option value="daily">{t('recurring.form.patternDaily')}</option>
+                      <option value="weekdays">{t('recurring.form.patternWeekdays')}</option>
+                      <option value="weekly">{t('recurring.form.patternWeekly')}</option>
+                      <option value="monthly">{t('recurring.form.patternMonthly')}</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                      <span>{t('recurring.form.intervalLabel')}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        {formPattern === 'daily'
+                          ? t('recurring.days')
+                          : formPattern === 'weekly'
+                          ? t('recurring.weeks')
+                          : formPattern === 'monthly'
+                          ? t('recurring.months')
+                          : ''}
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      disabled={formPattern === 'weekdays'}
+                      value={formInterval}
+                      onChange={(e) => setFormInterval(Math.max(1, Number(e.target.value)))}
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:border-indigo-500 focus:outline-none disabled:opacity-50 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Due Time & Quick Presets */}
+                <div className="pt-2.5 border-t border-indigo-100/70 dark:border-indigo-900/30">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <i className="pi pi-clock text-indigo-500 text-[10px]" />
+                      {t('recurring.form.dueTimeLabel')}
+                    </label>
+                    {formDueTime && (
+                      <button
+                        type="button"
+                        onClick={() => setFormDueTime('')}
+                        className="text-[10px] text-slate-400 hover:text-rose-500 flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <i className="pi pi-times text-[9px]" />
+                        <span>{t('common.clear') || 'Reset Jam'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                    <input
+                      type="time"
+                      value={formDueTime}
+                      onChange={(e) => setFormDueTime(e.target.value)}
+                      className="w-full sm:w-36 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:border-indigo-500 focus:outline-none transition-colors"
+                    />
+
+                    {/* Quick Preset Buttons */}
+                    <div className="flex items-center gap-1 overflow-x-auto py-0.5">
+                      {['09:00', '12:00', '17:00', '21:00', '23:59'].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setFormDueTime(preset)}
+                          className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer border ${
+                            formDueTime === preset
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Aktif Toggle */}
+                <div className="pt-2.5 border-t border-indigo-100/70 dark:border-indigo-900/30 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <InputSwitch
+                      checked={formIsActive}
+                      onChange={(e) => setFormIsActive(Boolean(e.value))}
+                    />
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      {t('recurring.form.activeStatusLabel')}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-[11px] font-semibold ${
+                      formIsActive
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                    }`}
+                  >
+                    {formIsActive ? t('recurring.active') : t('recurring.paused')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Checklist Subtasks Template */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
+                    {t('recurring.form.subtasksLabel')}
+                    {formSubtasks.length > 0 && (
+                      <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60">
+                        {formSubtasks.length}
+                      </span>
+                    )}
+                  </label>
+                </div>
+
+                {/* Subtask Items */}
+                {formSubtasks.length > 0 && (
+                  <div className="space-y-1.5 mb-2 max-h-36 overflow-y-auto pr-0.5">
+                    {formSubtasks.map((st, idx) => (
+                      <div
+                        key={idx}
+                        className="group flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 hover:bg-slate-100/80 dark:hover:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs transition-colors"
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <i className="pi pi-check-square text-xs text-indigo-500 dark:text-indigo-400 shrink-0" />
+                          <span className="truncate text-slate-800 dark:text-slate-200">
+                            {st}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSubtask(idx)}
+                          className="p-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 opacity-70 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          title="Hapus subtask"
+                        >
+                          <i className="pi pi-times text-[10px]" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Subtask Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newSubtaskInput}
+                    onChange={(e) => setNewSubtaskInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleAddSubtask(e)
+                      }
+                    }}
+                    placeholder={t('recurring.form.subtaskPlaceholder')}
+                    className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-none transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddSubtask()}
+                    disabled={!newSubtaskInput.trim()}
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 disabled:opacity-50 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <i className="pi pi-plus text-[10px]" />
+                    {t('recurring.form.addSubtaskBtn')}
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-800 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-3.5 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  {t('common.cancel') || 'Batal'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending || updateMutation.isPending || !formTitle.trim()}
+                  className="px-4 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg disabled:opacity-50 flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                >
+                  {(createMutation.isPending || updateMutation.isPending) && (
+                    <i className="pi pi-spin pi-spinner text-xs" />
+                  )}
+                  <span>{editingTemplate ? t('recurring.save') : t('recurring.createTemplateBtn')}</span>
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
-      </Dialog>
+        </div>
+      )}
     </div>
   )
 }
