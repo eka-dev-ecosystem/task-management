@@ -16,12 +16,18 @@ data class TaskUiState(
     val nextCursor: Long? = null,
     val tasks: List<Task> = emptyList(),
     val selectedStatus: String? = null,
+    val selectedProjectId: Long? = null,
     val searchQuery: String = "",
     val filterFocusOnly: Boolean = false,
     val error: String? = null,
     val selectedTask: Task? = null,
     val taskActivities: List<TaskActivity> = emptyList(),
-    val isLoadingActivities: Boolean = false
+    val isLoadingActivities: Boolean = false,
+    val projects: List<Project> = emptyList(),
+    val selectedTab: Int = 0, // 0 = Tasks, 1 = Recurring Templates
+    val recurringTasks: List<RecurringTaskItem> = emptyList(),
+    val isLoadingRecurring: Boolean = false,
+    val recurringFilter: String = "all" // "all", "active", "paused"
 )
 
 class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
@@ -32,8 +38,41 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
     val focusTasks: List<Task>
         get() = _uiState.value.tasks.filter { it.isFocus && it.status != "done" }
 
+    val filteredRecurringTasks: List<RecurringTaskItem>
+        get() = when (_uiState.value.recurringFilter) {
+            "active" -> _uiState.value.recurringTasks.filter { it.isActive }
+            "paused" -> _uiState.value.recurringTasks.filter { !it.isActive }
+            else -> _uiState.value.recurringTasks
+        }
+
     init {
         loadTasks(reset = true)
+        loadProjects()
+        loadRecurringTasks()
+    }
+
+    fun setSelectedTab(tab: Int) {
+        _uiState.value = _uiState.value.copy(selectedTab = tab)
+        if (tab == 1 && _uiState.value.recurringTasks.isEmpty()) {
+            loadRecurringTasks()
+        }
+    }
+
+    fun setRecurringFilter(filter: String) {
+        _uiState.value = _uiState.value.copy(recurringFilter = filter)
+    }
+
+    fun loadProjects() {
+        viewModelScope.launch {
+            try {
+                val res = apiClient.apiService.getProjects()
+                if (res.success && res.data != null) {
+                    _uiState.value = _uiState.value.copy(projects = res.data)
+                }
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
     }
 
     fun loadTasks(reset: Boolean = true) {
@@ -49,6 +88,7 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
             try {
                 val res = apiClient.apiService.getTasksPaginated(
                     status = _uiState.value.selectedStatus,
+                    projectId = _uiState.value.selectedProjectId,
                     search = _uiState.value.searchQuery.ifEmpty { null },
                     limit = 15,
                     cursor = if (reset) null else _uiState.value.nextCursor
@@ -88,6 +128,7 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
             try {
                 val res = apiClient.apiService.getTasksPaginated(
                     status = state.selectedStatus,
+                    projectId = state.selectedProjectId,
                     search = state.searchQuery.ifEmpty { null },
                     limit = 15,
                     cursor = state.nextCursor
@@ -111,6 +152,11 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
 
     fun setStatusFilter(status: String?) {
         _uiState.value = _uiState.value.copy(selectedStatus = status)
+        loadTasks(reset = true)
+    }
+
+    fun setProjectFilter(projectId: Long?) {
+        _uiState.value = _uiState.value.copy(selectedProjectId = projectId)
         loadTasks(reset = true)
     }
 
@@ -200,9 +246,11 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
         status: String? = null,
         priority: String? = null,
         dueDate: String? = null,
+        clearDueDate: Boolean = false,
         isFocus: Boolean? = null,
         tags: List<String>? = null,
         projectId: Long? = null,
+        clearProjectId: Boolean = false,
         onSuccess: (() -> Unit)? = null
     ) {
         viewModelScope.launch {
@@ -215,9 +263,11 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
                         status = status,
                         priority = priority,
                         dueDate = dueDate,
+                        clearDueDate = clearDueDate,
                         isFocus = isFocus,
                         tags = tags,
-                        projectId = projectId
+                        projectId = projectId,
+                        clearProjectId = clearProjectId
                     )
                 )
                 if (res.success && res.data != null) {
@@ -236,28 +286,40 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
     }
 
     fun createTask(
+        req: CreateTaskRequest,
+        onSuccess: (() -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                val res = apiClient.apiService.createTask(req)
+                if (res.success) {
+                    loadTasks()
+                    onSuccess?.invoke()
+                } else {
+                    _uiState.value = _uiState.value.copy(error = res.message)
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+            }
+        }
+    }
+
+    fun createTask(
         title: String,
         description: String,
         priority: String,
         isFocus: Boolean = false,
         projectId: Long? = null
     ) {
-        viewModelScope.launch {
-            try {
-                apiClient.apiService.createTask(
-                    CreateTaskRequest(
-                        title = title,
-                        description = description,
-                        priority = priority,
-                        isFocus = isFocus,
-                        projectId = projectId
-                    )
-                )
-                loadTasks()
-            } catch (e: Exception) {
-                // handle error
-            }
-        }
+        createTask(
+            CreateTaskRequest(
+                title = title,
+                description = description,
+                priority = priority,
+                isFocus = isFocus,
+                projectId = projectId
+            )
+        )
     }
 
     fun deleteTask(taskId: Long, onSuccess: (() -> Unit)? = null) {
@@ -279,18 +341,77 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
         }
     }
 
-    fun createSubtask(taskId: Long, title: String, dueDate: String? = null) {
+    fun createSubtask(
+        taskId: Long,
+        title: String,
+        description: String? = null,
+        dueDate: String? = null
+    ) {
         if (title.isBlank()) return
         viewModelScope.launch {
             try {
                 val res = apiClient.apiService.createSubtask(
                     taskId,
-                    CreateSubtaskRequest(title = title.trim(), dueDate = dueDate)
+                    CreateSubtaskRequest(
+                        title = title.trim(),
+                        description = description?.trim()?.ifEmpty { null },
+                        dueDate = dueDate
+                    )
                 )
                 if (res.success && res.data != null) {
                     val currentTask = _uiState.value.selectedTask
                     if (currentTask != null && currentTask.id == taskId) {
                         val updatedSubtasks = currentTask.subtasks + res.data
+                        val newCount = updatedSubtasks.size
+                        val newCompleted = updatedSubtasks.count { it.isCompleted }
+                        val newPercent = if (newCount > 0) (newCompleted * 100) / newCount else 0
+                        val updatedTask = currentTask.copy(
+                            subtasks = updatedSubtasks,
+                            subtasksCount = newCount,
+                            subtasksCompleted = newCompleted,
+                            progressPercent = newPercent
+                        )
+                        _uiState.value = _uiState.value.copy(
+                            selectedTask = updatedTask,
+                            tasks = _uiState.value.tasks.map { if (it.id == taskId) updatedTask else it }
+                        )
+                    }
+                    loadTasks()
+                }
+            } catch (e: Exception) {
+                // handle error
+            }
+        }
+    }
+
+    fun updateSubtask(
+        taskId: Long,
+        subtaskId: Long,
+        title: String? = null,
+        description: String? = null,
+        dueDate: String? = null,
+        isCompleted: Boolean? = null,
+        isCancelled: Boolean? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                val res = apiClient.apiService.updateSubtask(
+                    taskId,
+                    subtaskId,
+                    UpdateSubtaskRequest(
+                        title = title,
+                        description = description,
+                        dueDate = dueDate,
+                        isCompleted = isCompleted,
+                        isCancelled = isCancelled
+                    )
+                )
+                if (res.success && res.data != null) {
+                    val currentTask = _uiState.value.selectedTask
+                    if (currentTask != null && currentTask.id == taskId) {
+                        val updatedSubtasks = currentTask.subtasks.map {
+                            if (it.id == subtaskId) res.data else it
+                        }
                         val newCount = updatedSubtasks.size
                         val newCompleted = updatedSubtasks.count { it.isCompleted }
                         val newPercent = if (newCount > 0) (newCompleted * 100) / newCount else 0
@@ -412,6 +533,102 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
                     _uiState.value = _uiState.value.copy(
                         taskActivities = listOf(res.data) + currentList
                     )
+                }
+            } catch (e: Exception) {
+                // handle error
+            }
+        }
+    }
+
+    // ==========================================
+    // Recurring Tasks Management
+    // ==========================================
+
+    fun loadRecurringTasks() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingRecurring = true)
+            try {
+                val res = apiClient.apiService.getRecurringTasks()
+                if (res.success && res.data != null) {
+                    _uiState.value = _uiState.value.copy(
+                        recurringTasks = res.data,
+                        isLoadingRecurring = false
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(isLoadingRecurring = false)
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoadingRecurring = false)
+            }
+        }
+    }
+
+    fun createRecurringTask(
+        req: CreateRecurringTaskRequest,
+        onSuccess: (() -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                val res = apiClient.apiService.createRecurringTask(req)
+                if (res.success && res.data != null) {
+                    val current = _uiState.value.recurringTasks
+                    _uiState.value = _uiState.value.copy(recurringTasks = listOf(res.data) + current)
+                    onSuccess?.invoke()
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+            }
+        }
+    }
+
+    fun updateRecurringTask(
+        id: Long,
+        req: UpdateRecurringTaskRequest,
+        onSuccess: (() -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                val res = apiClient.apiService.updateRecurringTask(id, req)
+                if (res.success && res.data != null) {
+                    val updated = _uiState.value.recurringTasks.map {
+                        if (it.id == id) res.data else it
+                    }
+                    _uiState.value = _uiState.value.copy(recurringTasks = updated)
+                    onSuccess?.invoke()
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+            }
+        }
+    }
+
+    fun deleteRecurringTask(
+        id: Long,
+        onSuccess: (() -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                val res = apiClient.apiService.deleteRecurringTask(id)
+                if (res.success) {
+                    val updated = _uiState.value.recurringTasks.filter { it.id != id }
+                    _uiState.value = _uiState.value.copy(recurringTasks = updated)
+                    onSuccess?.invoke()
+                }
+            } catch (e: Exception) {
+                // handle error
+            }
+        }
+    }
+
+    fun toggleActiveRecurringTask(id: Long) {
+        viewModelScope.launch {
+            try {
+                val res = apiClient.apiService.toggleActiveRecurringTask(id)
+                if (res.success && res.data != null) {
+                    val updated = _uiState.value.recurringTasks.map {
+                        if (it.id == id) res.data else it
+                    }
+                    _uiState.value = _uiState.value.copy(recurringTasks = updated)
                 }
             } catch (e: Exception) {
                 // handle error

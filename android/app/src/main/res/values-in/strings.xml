@@ -207,4 +207,59 @@
     <string name="mcp_delete_title">Hapus Token MCP?</string>
     <string name="mcp_delete_desc">Apakah Anda yakin ingin mencabut token \'%1$s\'? AI Client yang menggunakan token ini tidak dapat mengakses task lagi.</string>
     <string name="mcp_revoke_btn">Cabut Token</string>
+
+    <!-- Recurring Tasks & Templates -->
+    <string name="tab_tasks">Tugas</string>
+    <string name="tab_recurring">Jadwal Berulang</string>
+    <string name="recurring_empty_title">Belum Ada Template Berulang</string>
+    <string name="recurring_empty_desc">Buat template tugas berulang untuk menjadwalkan tugas otomatis harian, mingguan, atau bulanan.</string>
+    <string name="create_recurring_title">Buat Template Berulang</string>
+    <string name="edit_recurring_title">Edit Template Berulang</string>
+    <string name="delete_recurring">Hapus Template</string>
+    <string name="delete_recurring_confirm_title">Hapus Template?</string>
+    <string name="delete_recurring_confirm_desc">Apakah Anda yakin ingin menghapus template \'%1$s\'? Tugas yang sudah dibuat sebelumnya tidak akan terhapus.</string>
+    <string name="recurring_active">Aktif</string>
+    <string name="recurring_paused">Dijeda</string>
+    <string name="pattern_daily">Harian</string>
+    <string name="pattern_weekdays">Hari Kerja (Senin-Jumat)</string>
+    <string name="pattern_weekly">Mingguan</string>
+    <string name="pattern_monthly">Bulanan</string>
+    <string name="repeat_pattern">Pola Perulangan</string>
+    <string name="repeat_interval">Ulangi Setiap %1$d %2$s</string>
+    <string name="unit_days">Hari</string>
+    <string name="unit_weeks">Minggu</string>
+    <string name="unit_months">Bulan</string>
+    <string name="recurring_due_time_label">Jam Deadline (Opsional)</string>
+    <string name="due_time_at">Jatuh tempo jam %1$s</string>
+    <string name="pause">Jeda</string>
+    <string name="resume">Lanjutkan</string>
+
+    <!-- Task Form Enhancements -->
+    <string name="project_label">Proyek</string>
+    <string name="no_project">Tanpa Proyek</string>
+    <string name="due_date_label">Batas Waktu</string>
+    <string name="set_due_date">Atur Batas Waktu</string>
+    <string name="tags_label">Tag (pisahkan dengan koma)</string>
+    <string name="subtask_description_label">Deskripsi Subtask (Opsional)</string>
+    <string name="subtask_due_date_label">Deadline Subtask (Opsional)</string>
+    <string name="subtask_due_date_exceed_warning">Peringatan: Deadline subtask melebihi batas waktu tugas utama!</string>
+    <string name="edit_subtask_title">Edit Subtask</string>
+    <string name="order_index_label">Urutan #%1$d</string>
+
+    <!-- Reminder Enhancements -->
+    <string name="create_reminder_title">Pengingat Baru</string>
+    <string name="create_reminder">Buat Pengingat</string>
+    <string name="associated_task_label">Tautkan ke Tugas (Opsional)</string>
+    <string name="no_associated_task">Tidak Ada (Pengingat Umum)</string>
+    <string name="preset_deadline_exact">Saat Deadline</string>
+    <string name="preset_deadline_15m">-15 Menit</string>
+    <string name="preset_deadline_1h">-1 Jam</string>
+    <string name="preset_deadline_1d">-1 Hari</string>
+    <string name="preset_relative_10m">+10 Menit</string>
+    <string name="preset_relative_1h">+1 Jam</string>
+    <string name="preset_relative_tomorrow">Besok 09:00</string>
+    <string name="filter_upcoming">Mendatang</string>
+    <string name="filter_completed">Selesai</string>
+    <string name="delete_reminder_confirm_title">Hapus Pengingat?</string>
+    <string name="delete_reminder_confirm_desc">Apakah Anda yakin ingin menghapus pengingat ini?</string>
 </resources>

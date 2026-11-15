@@ -103,6 +103,28 @@ interface ApiService {
         @Body req: CreateTaskActivityRequest
     ): BaseResponse<TaskActivity>
 
+    // Recurring Tasks
+    @GET("recurring-tasks")
+    suspend fun getRecurringTasks(): BaseResponse<List<RecurringTaskItem>>
+
+    @POST("recurring-tasks")
+    suspend fun createRecurringTask(@Body req: CreateRecurringTaskRequest): BaseResponse<RecurringTaskItem>
+
+    @GET("recurring-tasks/{id}")
+    suspend fun getRecurringTaskById(@Path("id") id: Long): BaseResponse<RecurringTaskItem>
+
+    @PUT("recurring-tasks/{id}")
+    suspend fun updateRecurringTask(
+        @Path("id") id: Long,
+        @Body req: UpdateRecurringTaskRequest
+    ): BaseResponse<RecurringTaskItem>
+
+    @DELETE("recurring-tasks/{id}")
+    suspend fun deleteRecurringTask(@Path("id") id: Long): BaseResponse<Unit>
+
+    @POST("recurring-tasks/{id}/toggle-active")
+    suspend fun toggleActiveRecurringTask(@Path("id") id: Long): BaseResponse<RecurringTaskItem>
+
     // Projects
     @GET("projects")
     suspend fun getProjects(): BaseResponse<List<Project>>

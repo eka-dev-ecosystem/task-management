@@ -1,5 +1,6 @@
 package cloud.eka_dev.task_hub.feature.task
 
+import android.content.Context
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -18,7 +19,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -26,8 +29,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.eka_dev.task_hub.R
 import cloud.eka_dev.task_hub.core.designsystem.*
+import cloud.eka_dev.task_hub.core.model.Project
+import cloud.eka_dev.task_hub.core.model.Subtask
 import cloud.eka_dev.task_hub.core.model.Task
 import cloud.eka_dev.task_hub.core.model.TaskActivity
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -182,8 +188,9 @@ fun TaskDetailBottomSheet(
     if (showEditDialog) {
         EditTaskDialog(
             task = currentTask,
+            projects = uiState.projects,
             onDismiss = { showEditDialog = false },
-            onSave = { updatedTitle, updatedDesc, updatedStatus, updatedPriority, updatedIsFocus ->
+            onSave = { updatedTitle, updatedDesc, updatedStatus, updatedPriority, updatedIsFocus, updatedProjectId, clearProjectId, updatedDueDate, clearDueDate, updatedTags ->
                 viewModel.updateTask(
                     id = currentTask.id,
                     title = updatedTitle,
@@ -191,6 +198,11 @@ fun TaskDetailBottomSheet(
                     status = updatedStatus,
                     priority = updatedPriority,
                     isFocus = updatedIsFocus,
+                    projectId = updatedProjectId,
+                    clearProjectId = clearProjectId,
+                    dueDate = updatedDueDate,
+                    clearDueDate = clearDueDate,
+                    tags = updatedTags,
                     onSuccess = {
                         showEditDialog = false
                     }
@@ -206,8 +218,18 @@ private fun DetailTabContent(
     viewModel: TaskViewModel,
     onTaskDeleted: () -> Unit
 ) {
+    val context = LocalContext.current
     var newSubtaskText by remember { mutableStateOf("") }
+    var newSubtaskDesc by remember { mutableStateOf("") }
+    var showSubtaskOptions by remember { mutableStateOf(false) }
+    var hasSubtaskDueDate by remember { mutableStateOf(false) }
+    var subtaskDueDateDate by remember { mutableStateOf("") }
+    var subtaskDueDateTime by remember { mutableStateOf("17:00") }
+    var editingSubtask by remember { mutableStateOf<Subtask?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    val fullSubtaskDueDate = if (hasSubtaskDueDate && subtaskDueDateDate.isNotBlank()) "${subtaskDueDateDate}T${subtaskDueDateTime}:00Z" else null
+    val isSubtaskExceeding = task.dueDate != null && fullSubtaskDueDate != null && fullSubtaskDueDate > task.dueDate
 
     Column(
         modifier = Modifier
@@ -301,41 +323,131 @@ private fun DetailTabContent(
         }
 
         // Add Subtask Form
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-                .padding(6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            OutlinedTextField(
-                value = newSubtaskText,
-                onValueChange = { newSubtaskText = it },
-                placeholder = { Text(stringResource(R.string.add_subtask_placeholder), fontSize = 12.sp) },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface
-                ),
-                shape = RoundedCornerShape(8.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            IconButton(
-                onClick = {
-                    if (newSubtaskText.isNotBlank()) {
-                        viewModel.createSubtask(task.id, newSubtaskText.trim())
-                        newSubtaskText = ""
-                    }
-                },
-                enabled = newSubtaskText.isNotBlank()
-            ) {
-                Icon(
-                    Icons.Default.AddCircle,
-                    contentDescription = stringResource(R.string.add_subtask),
-                    tint = if (newSubtaskText.isNotBlank()) BrandPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = newSubtaskText,
+                    onValueChange = { newSubtaskText = it },
+                    placeholder = { Text(stringResource(R.string.add_subtask_placeholder), fontSize = 12.sp) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    shape = RoundedCornerShape(8.dp)
                 )
+                Spacer(modifier = Modifier.width(6.dp))
+                IconButton(
+                    onClick = {
+                        if (newSubtaskText.isNotBlank()) {
+                            viewModel.createSubtask(
+                                taskId = task.id,
+                                title = newSubtaskText.trim(),
+                                description = newSubtaskDesc.trim().ifEmpty { null },
+                                dueDate = fullSubtaskDueDate
+                            )
+                            newSubtaskText = ""
+                            newSubtaskDesc = ""
+                            hasSubtaskDueDate = false
+                            subtaskDueDateDate = ""
+                            showSubtaskOptions = false
+                        }
+                    },
+                    enabled = newSubtaskText.isNotBlank()
+                ) {
+                    Icon(
+                        Icons.Default.AddCircle,
+                        contentDescription = stringResource(R.string.add_subtask),
+                        tint = if (newSubtaskText.isNotBlank()) BrandPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    )
+                }
+            }
+
+            TextButton(
+                onClick = { showSubtaskOptions = !showSubtaskOptions },
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    if (showSubtaskOptions) "Sembunyikan Opsi Detail" else "+ Tambah Deskripsi & Deadline Subtask",
+                    fontSize = 11.sp,
+                    color = BrandPrimary
+                )
+            }
+
+            if (showSubtaskOptions) {
+                OutlinedTextField(
+                    value = newSubtaskDesc,
+                    onValueChange = { newSubtaskDesc = it },
+                    label = { Text(stringResource(R.string.subtask_description_label), fontSize = 11.sp) },
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 2
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.subtask_due_date_label), fontSize = 11.sp)
+                    Switch(
+                        checked = hasSubtaskDueDate,
+                        onCheckedChange = { hasSubtaskDueDate = it },
+                        modifier = Modifier.scale(0.8f)
+                    )
+                }
+
+                if (hasSubtaskDueDate) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val cal = Calendar.getInstance()
+                        OutlinedButton(
+                            onClick = {
+                                android.app.DatePickerDialog(
+                                    context,
+                                    { _, year, month, dayOfMonth ->
+                                        subtaskDueDateDate = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth)
+                                    },
+                                    cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(subtaskDueDateDate.ifEmpty { "Tanggal" }, fontSize = 11.sp)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                android.app.TimePickerDialog(
+                                    context,
+                                    { _, h, m ->
+                                        subtaskDueDateTime = String.format("%02d:%02d", h, m)
+                                    },
+                                    cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(subtaskDueDateTime, fontSize = 11.sp)
+                        }
+                    }
+                    if (isSubtaskExceeding) {
+                        Text(
+                            stringResource(R.string.subtask_due_date_exceed_warning),
+                            fontSize = 10.sp,
+                            color = Color(0xFFEF4444)
+                        )
+                    }
+                }
             }
         }
 
@@ -416,6 +528,18 @@ private fun DetailTabContent(
                             }
                         }
                         IconButton(
+                            onClick = { editingSubtask = subtask },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = stringResource(R.string.edit),
+                                tint = BrandPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
                             onClick = { viewModel.toggleSubtaskCancelled(task.id, subtask.id, subtask.isCancelled) },
                             modifier = Modifier.size(24.dp)
                         ) {
@@ -463,6 +587,24 @@ private fun DetailTabContent(
             Spacer(modifier = Modifier.width(6.dp))
             Text(stringResource(R.string.delete_task_button), fontWeight = FontWeight.SemiBold)
         }
+    }
+
+    editingSubtask?.let { st ->
+        EditSubtaskDialog(
+            subtask = st,
+            taskDueDate = task.dueDate,
+            onDismiss = { editingSubtask = null },
+            onSave = { updatedTitle, updatedDesc, updatedDueDate ->
+                viewModel.updateSubtask(
+                    taskId = task.id,
+                    subtaskId = st.id,
+                    title = updatedTitle,
+                    description = updatedDesc,
+                    dueDate = updatedDueDate
+                )
+                editingSubtask = null
+            }
+        )
     }
 
     if (showDeleteDialog) {
@@ -635,14 +777,43 @@ private fun getActivityBadge(type: String): ActivityBadge {
 @Composable
 fun EditTaskDialog(
     task: Task,
+    projects: List<Project>,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, String, Boolean) -> Unit
+    onSave: (
+        title: String,
+        description: String,
+        status: String,
+        priority: String,
+        isFocus: Boolean,
+        projectId: Long?,
+        clearProjectId: Boolean,
+        dueDate: String?,
+        clearDueDate: Boolean,
+        tags: List<String>
+    ) -> Unit
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf(task.title) }
-    var description by remember { mutableStateOf(task.description ?: "") }
+    var description by remember { mutableStateOf(task.description) }
     var status by remember { mutableStateOf(task.status) }
     var priority by remember { mutableStateOf(task.priority) }
     var isFocus by remember { mutableStateOf(task.isFocus) }
+    var selectedProjectId by remember { mutableStateOf(task.projectId) }
+    var tagsText by remember { mutableStateOf(task.tags.joinToString(", ")) }
+
+    var hasDueDate by remember { mutableStateOf(!task.dueDate.isNullOrBlank()) }
+    var dueDateDate by remember {
+        mutableStateOf(
+            if (!task.dueDate.isNullOrBlank() && task.dueDate.length >= 10) task.dueDate.substring(0, 10) else ""
+        )
+    }
+    var dueDateTime by remember {
+        mutableStateOf(
+            if (!task.dueDate.isNullOrBlank() && task.dueDate.length >= 16) task.dueDate.substring(11, 16) else "23:59"
+        )
+    }
+
+    val fullDueDate = if (hasDueDate && dueDateDate.isNotBlank()) "${dueDateDate}T${dueDateTime}:00Z" else null
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -658,6 +829,7 @@ fun EditTaskDialog(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text(stringResource(R.string.task_title_label)) },
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -666,22 +838,27 @@ fun EditTaskDialog(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text(stringResource(R.string.task_desc_label)) },
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3,
                     maxLines = 5
                 )
 
-                Text(stringResource(R.string.status_header), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text(stringResource(R.string.status_header), fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    listOf(
-                        "todo" to stringResource(R.string.filter_todo),
-                        "in_progress" to stringResource(R.string.filter_in_progress),
-                        "review" to stringResource(R.string.filter_review),
-                        "done" to stringResource(R.string.filter_done)
-                    ).forEach { (st, label) ->
+                    listOf("todo", "in_progress", "review", "done").forEach { st ->
+                        val label = when (st) {
+                            "todo" -> stringResource(R.string.filter_todo)
+                            "in_progress" -> stringResource(R.string.filter_in_progress)
+                            "review" -> stringResource(R.string.filter_review)
+                            "done" -> stringResource(R.string.filter_done)
+                            else -> st
+                        }
                         FilterChip(
                             selected = status == st,
                             onClick = { status = st },
@@ -690,22 +867,103 @@ fun EditTaskDialog(
                     }
                 }
 
-                Text(stringResource(R.string.priority_label), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text(stringResource(R.string.priority_label), fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    listOf(
-                        "low" to stringResource(R.string.priority_low),
-                        "medium" to stringResource(R.string.priority_medium),
-                        "high" to stringResource(R.string.priority_high),
-                        "urgent" to stringResource(R.string.priority_urgent)
-                    ).forEach { (pr, label) ->
+                    listOf("low", "medium", "high", "urgent").forEach { p ->
+                        val pLabel = when (p) {
+                            "low" -> stringResource(R.string.priority_low)
+                            "medium" -> stringResource(R.string.priority_medium)
+                            "high" -> stringResource(R.string.priority_high)
+                            "urgent" -> stringResource(R.string.priority_urgent)
+                            else -> p
+                        }
                         FilterChip(
-                            selected = priority == pr,
-                            onClick = { priority = pr },
-                            label = { Text(label, fontSize = 11.sp) }
+                            selected = priority == p,
+                            onClick = { priority = p },
+                            label = { Text(pLabel, fontSize = 11.sp) }
                         )
+                    }
+                }
+
+                // Project Selector
+                if (projects.isNotEmpty()) {
+                    Text(stringResource(R.string.project_label), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedProjectId == null,
+                            onClick = { selectedProjectId = null },
+                            label = { Text(stringResource(R.string.no_project), fontSize = 11.sp) }
+                        )
+                        projects.forEach { proj ->
+                            val projColor = Color(android.graphics.Color.parseColor(proj.color.ifEmpty { "#3B82F6" }))
+                            FilterChip(
+                                selected = selectedProjectId == proj.id,
+                                onClick = { selectedProjectId = proj.id },
+                                leadingIcon = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(projColor)
+                                    )
+                                },
+                                label = { Text(proj.name, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                // Due Date Toggle & Pickers
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.due_date_label), fontSize = 13.sp)
+                    Switch(checked = hasDueDate, onCheckedChange = { hasDueDate = it })
+                }
+                if (hasDueDate) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val cal = Calendar.getInstance()
+                        OutlinedButton(
+                            onClick = {
+                                android.app.DatePickerDialog(
+                                    context,
+                                    { _, year, month, dayOfMonth ->
+                                        dueDateDate = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth)
+                                    },
+                                    cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(dueDateDate.ifEmpty { "Pilih Tanggal" }, fontSize = 11.sp)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                android.app.TimePickerDialog(
+                                    context,
+                                    { _, h, m ->
+                                        dueDateTime = String.format("%02d:%02d", h, m)
+                                    },
+                                    cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(dueDateTime, fontSize = 11.sp)
+                        }
                     }
                 }
 
@@ -720,6 +978,15 @@ fun EditTaskDialog(
                         onCheckedChange = { isFocus = it }
                     )
                 }
+
+                OutlinedTextField(
+                    value = tagsText,
+                    onValueChange = { tagsText = it },
+                    label = { Text(stringResource(R.string.tags_label)) },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
             }
         },
         confirmButton = {
@@ -727,10 +994,138 @@ fun EditTaskDialog(
                 text = stringResource(R.string.save),
                 onClick = {
                     if (title.isNotBlank()) {
-                        onSave(title.trim(), description.trim(), status, priority, isFocus)
+                        val parsedTags = tagsText.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                        onSave(
+                            title.trim(),
+                            description.trim(),
+                            status,
+                            priority,
+                            isFocus,
+                            selectedProjectId,
+                            selectedProjectId == null,
+                            fullDueDate,
+                            !hasDueDate,
+                            parsedTags
+                        )
                     }
                 },
                 enabled = title.isNotBlank()
+            )
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+fun EditSubtaskDialog(
+    subtask: Subtask,
+    taskDueDate: String?,
+    onDismiss: () -> Unit,
+    onSave: (title: String, description: String?, dueDate: String?) -> Unit
+) {
+    val context = LocalContext.current
+    var title by remember { mutableStateOf(subtask.title) }
+    var description by remember { mutableStateOf(subtask.description) }
+    var hasDueDate by remember { mutableStateOf(!subtask.dueDate.isNullOrBlank()) }
+    var dueDateDate by remember {
+        mutableStateOf(
+            if (!subtask.dueDate.isNullOrBlank() && subtask.dueDate.length >= 10) subtask.dueDate.substring(0, 10) else ""
+        )
+    }
+    var dueDateTime by remember {
+        mutableStateOf(
+            if (!subtask.dueDate.isNullOrBlank() && subtask.dueDate.length >= 16) subtask.dueDate.substring(11, 16) else "17:00"
+        )
+    }
+
+    val fullSubtaskDueDate = if (hasDueDate && dueDateDate.isNotBlank()) "${dueDateDate}T${dueDateTime}:00Z" else null
+    val isExceeding = taskDueDate != null && fullSubtaskDueDate != null && fullSubtaskDueDate > taskDueDate
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.edit_subtask_title), fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(stringResource(R.string.task_title_label)) },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(stringResource(R.string.subtask_description_label)) },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.subtask_due_date_label), fontSize = 13.sp)
+                    Switch(checked = hasDueDate, onCheckedChange = { hasDueDate = it })
+                }
+                if (hasDueDate) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val cal = Calendar.getInstance()
+                        OutlinedButton(
+                            onClick = {
+                                android.app.DatePickerDialog(
+                                    context,
+                                    { _, year, month, dayOfMonth ->
+                                        dueDateDate = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth)
+                                    },
+                                    cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(dueDateDate.ifEmpty { "Tanggal" }, fontSize = 11.sp)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                android.app.TimePickerDialog(
+                                    context,
+                                    { _, h, m ->
+                                        dueDateTime = String.format("%02d:%02d", h, m)
+                                    },
+                                    cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(dueDateTime, fontSize = 11.sp)
+                        }
+                    }
+                    if (isExceeding) {
+                        Text(
+                            stringResource(R.string.subtask_due_date_exceed_warning),
+                            fontSize = 10.sp,
+                            color = Color(0xFFEF4444)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            AppButton(
+                text = stringResource(R.string.save),
+                enabled = title.isNotBlank(),
+                onClick = {
+                    onSave(title.trim(), description.trim().ifEmpty { null }, fullSubtaskDueDate)
+                }
             )
         },
         dismissButton = {

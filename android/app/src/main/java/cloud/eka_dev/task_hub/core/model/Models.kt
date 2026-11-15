@@ -88,6 +88,13 @@ data class TaskCursorResponse(
 )
 
 @Serializable
+data class CreateTaskSubtaskItem(
+    val title: String,
+    val description: String? = null,
+    @SerialName("due_date") val dueDate: String? = null
+)
+
+@Serializable
 data class CreateTaskRequest(
     val title: String,
     val description: String = "",
@@ -97,7 +104,11 @@ data class CreateTaskRequest(
     @SerialName("is_focus") val isFocus: Boolean = false,
     val tags: List<String> = emptyList(),
     @SerialName("project_id") val projectId: Long? = null,
-    val subtasks: List<String> = emptyList()
+    val subtasks: List<CreateTaskSubtaskItem> = emptyList(),
+    @SerialName("is_recurring") val isRecurring: Boolean = false,
+    @SerialName("recurrence_pattern") val recurrencePattern: String? = null,
+    @SerialName("recurrence_interval") val recurrenceInterval: Int? = null,
+    @SerialName("recurrence_end_date") val recurrenceEndDate: String? = null
 )
 
 @Serializable
@@ -107,10 +118,75 @@ data class UpdateTaskRequest(
     val status: String? = null,
     val priority: String? = null,
     @SerialName("due_date") val dueDate: String? = null,
+    @SerialName("clear_due_date") val clearDueDate: Boolean = false,
     @SerialName("is_focus") val isFocus: Boolean? = null,
     val tags: List<String>? = null,
     @SerialName("project_id") val projectId: Long? = null,
+    @SerialName("clear_project_id") val clearProjectId: Boolean = false,
     @SerialName("last_progress_note") val lastProgressNote: String? = null
+)
+
+@Serializable
+data class RecurringSubtaskItem(
+    val id: Long? = null,
+    @SerialName("recurring_task_id") val recurringTaskId: Long? = null,
+    val title: String,
+    val description: String = "",
+    @SerialName("order_index") val orderIndex: Int = 0
+)
+
+@Serializable
+data class RecurringTaskItem(
+    val id: Long,
+    @SerialName("user_id") val userId: String,
+    val title: String,
+    val description: String = "",
+    val priority: String = "medium",
+    @SerialName("project_id") val projectId: Long? = null,
+    @SerialName("project_name") val projectName: String? = null,
+    @SerialName("project_color") val projectColor: String? = null,
+    val tags: List<String> = emptyList(),
+    @SerialName("recurrence_pattern") val recurrencePattern: String = "daily",
+    @SerialName("recurrence_interval") val recurrenceInterval: Int = 1,
+    @SerialName("recurrence_end_date") val recurrenceEndDate: String? = null,
+    @SerialName("due_time") val dueTime: String? = null,
+    @SerialName("is_active") val isActive: Boolean = true,
+    @SerialName("last_generated_at") val lastGeneratedAt: String? = null,
+    val subtasks: List<RecurringSubtaskItem> = emptyList()
+)
+
+@Serializable
+data class CreateRecurringSubtaskItem(
+    val title: String,
+    @SerialName("order_index") val orderIndex: Int = 0
+)
+
+@Serializable
+data class CreateRecurringTaskRequest(
+    val title: String,
+    val description: String? = null,
+    val priority: String = "medium",
+    @SerialName("project_id") val projectId: Long? = null,
+    @SerialName("recurrence_pattern") val recurrencePattern: String = "daily",
+    @SerialName("recurrence_interval") val recurrenceInterval: Int = 1,
+    @SerialName("due_time") val dueTime: String? = null,
+    @SerialName("is_active") val isActive: Boolean = true,
+    val subtasks: List<CreateRecurringSubtaskItem>? = null
+)
+
+@Serializable
+data class UpdateRecurringTaskRequest(
+    val title: String? = null,
+    val description: String? = null,
+    val priority: String? = null,
+    @SerialName("project_id") val projectId: Long? = null,
+    @SerialName("clear_project_id") val clearProjectId: Boolean = false,
+    @SerialName("recurrence_pattern") val recurrencePattern: String? = null,
+    @SerialName("recurrence_interval") val recurrenceInterval: Int? = null,
+    @SerialName("due_time") val dueTime: String? = null,
+    @SerialName("clear_due_time") val clearDueTime: Boolean = false,
+    @SerialName("is_active") val isActive: Boolean? = null,
+    val subtasks: List<CreateRecurringSubtaskItem>? = null
 )
 
 @Serializable
