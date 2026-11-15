@@ -340,19 +340,18 @@ public struct ProjectListView: View {
             .sheet(item: $selectedTaskForDetail) { task in
                 TaskDetailSheet(task: task, viewModel: taskViewModel)
             }
-            .confirmationDialog(
+            .alert(
                 "Hapus Proyek?",
                 isPresented: $showDeleteConfirmation,
-                titleVisibility: .visible,
                 presenting: projectToDelete
             ) { proj in
+                Button(L10n.General.cancel, role: .cancel) {}
                 Button(L10n.Projects.deleteConfirmation(name: proj.name), role: .destructive) {
                     Task {
                         _ = await viewModel.deleteProject(id: proj.id)
                         await taskViewModel.loadProjects()
                     }
                 }
-                Button(L10n.General.cancel, role: .cancel) {}
             } message: { proj in
                 Text(L10n.Projects.deleteWarningNotice)
             }

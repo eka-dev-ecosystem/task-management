@@ -157,11 +157,11 @@ public struct TaskDetailSheet: View {
                     }
                 }
             }
-            .confirmationDialog(
+            .alert(
                 L10n.Tasks.deleteTaskConfirmTitle,
-                isPresented: $showDeleteTaskConfirm,
-                titleVisibility: .visible
+                isPresented: $showDeleteTaskConfirm
             ) {
+                Button(L10n.General.cancel, role: .cancel) {}
                 Button(L10n.Tasks.deleteTask, role: .destructive) {
                     Task {
                         let success = await viewModel.deleteTask(id: currentTask.id)
@@ -170,7 +170,6 @@ public struct TaskDetailSheet: View {
                         }
                     }
                 }
-                Button(L10n.General.cancel, role: .cancel) {}
             } message: {
                 Text(L10n.Tasks.deleteTaskConfirmMessage)
             }

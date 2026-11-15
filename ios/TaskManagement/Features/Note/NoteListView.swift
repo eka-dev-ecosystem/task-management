@@ -335,28 +335,32 @@ public struct NoteListView: View {
             .sheet(item: $noteToEdit) { note in
                 EditNoteSheet(note: note, viewModel: viewModel)
             }
-            .confirmationDialog(
+            .alert(
                 L10n.Notes.deleteConfirmTitle,
-                isPresented: $showDeleteConfirm,
-                titleVisibility: .visible
+                isPresented: $showDeleteConfirm
             ) {
+                Button(L10n.General.cancel, role: .cancel) {
+                    noteToDelete = nil
+                }
                 Button(L10n.Notes.deleteNote, role: .destructive) {
                     if let note = noteToDelete {
                         viewModel.deleteNote(id: note.id)
+                        noteToDelete = nil
                     }
                 }
-                Button(L10n.General.cancel, role: .cancel) {}
             } message: {
                 Text(L10n.Notes.deleteConfirmMessage)
             }
-            .confirmationDialog(
+            .alert(
                 L10n.Notes.convertConfirmTitle,
                 isPresented: Binding(
                     get: { noteToConvert != nil },
                     set: { if !$0 { noteToConvert = nil } }
-                ),
-                titleVisibility: .visible
+                )
             ) {
+                Button(L10n.General.cancel, role: .cancel) {
+                    noteToConvert = nil
+                }
                 Button(L10n.Notes.convertToTask) {
                     if let note = noteToConvert {
                         Task {
@@ -364,9 +368,6 @@ public struct NoteListView: View {
                             noteToConvert = nil
                         }
                     }
-                }
-                Button(L10n.General.cancel, role: .cancel) {
-                    noteToConvert = nil
                 }
             } message: {
                 Text(L10n.Notes.convertConfirmMessage)
