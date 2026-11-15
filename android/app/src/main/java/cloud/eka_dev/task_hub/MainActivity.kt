@@ -4,6 +4,8 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -87,7 +89,11 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    if ((!splashCompleted || tokenState == "loading") && pendingHubLink == null) {
+                    AnimatedVisibility(
+                        visible = (!splashCompleted || tokenState == "loading") && pendingHubLink == null,
+                        enter = EnterTransition.None,
+                        exit = fadeOut(animationSpec = tween(380))
+                    ) {
                         SplashScreen(
                             onComplete = {
                                 splashCompleted = true

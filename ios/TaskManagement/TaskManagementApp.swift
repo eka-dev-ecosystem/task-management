@@ -109,18 +109,15 @@ struct TaskManagementApp: App {
                         })
                     }
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                .disabled(showSplash && pendingHubLink == nil)
 
                 if showSplash && pendingHubLink == nil {
                     SplashScreenView {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                        withAnimation(.easeInOut(duration: 0.38)) {
                             showSplash = false
                         }
                     }
-                    .transition(.asymmetric(
-                        insertion: .identity,
-                        removal: .opacity.combined(with: .scale(scale: 1.06))
-                    ))
+                    .transition(.opacity)
                     .zIndex(100)
                 }
             }

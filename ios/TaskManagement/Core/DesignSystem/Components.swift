@@ -507,8 +507,6 @@ public struct SplashScreenView: View {
                 .opacity(taglineOpacity)
             }
         }
-        .scaleEffect(isExiting ? 1.08 : 1.0)
-        .opacity(isExiting ? 0.0 : 1.0)
         .onAppear {
             startAnimationSequence()
         }
@@ -582,14 +580,9 @@ public struct SplashScreenView: View {
             shimmerPhase = 1.2
         }
 
-        // 7. Finish after minimum splash time and smoothly morph exit
+        // 7. Finish after minimum splash time and smoothly notify parent for single fade-out
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.85) {
-            withAnimation(.easeInOut(duration: 0.42)) {
-                isExiting = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
-                onFinished()
-            }
+            onFinished()
         }
     }
 }

@@ -38,19 +38,6 @@ import kotlinx.coroutines.launch
 fun SplashScreen(
     onComplete: () -> Unit = {}
 ) {
-    var isExiting by remember { mutableStateOf(false) }
-
-    val exitScale by animateFloatAsState(
-        targetValue = if (isExiting) 1.08f else 1f,
-        animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
-        label = "exitScale"
-    )
-    val exitAlpha by animateFloatAsState(
-        targetValue = if (isExiting) 0f else 1f,
-        animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
-        label = "exitAlpha"
-    )
-
     // Infinite Transitions for Ambient Glow, Radar Rings, and Shimmer
     val infiniteTransition = rememberInfiniteTransition(label = "SplashInfiniteTransition")
 
@@ -169,8 +156,6 @@ fun SplashScreen(
 
         // Minimum splash display duration (1850ms) before fluid exit
         delay(1850)
-        isExiting = true
-        delay(380)
         onComplete()
     }
 
@@ -187,12 +172,7 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkSurfaceBackground)
-            .graphicsLayer {
-                scaleX = exitScale
-                scaleY = exitScale
-                alpha = exitAlpha
-            },
+            .background(DarkSurfaceBackground),
         contentAlignment = Alignment.Center
     ) {
         // 1. Ambient Background Aurora Spotlights
