@@ -1652,10 +1652,11 @@ struct RecurringTaskCardView: View {
 
                 // Due Time Badge (if set)
                 if let dueTime = item.dueTime, !dueTime.isEmpty {
+                    let formattedTime = dueTime.count >= 5 ? String(dueTime.prefix(5)) : dueTime
                     HStack(spacing: 3) {
                         Image(systemName: "clock")
                             .font(.system(size: 10))
-                        Text(dueTime)
+                        Text(formattedTime)
                             .font(.system(size: 11, weight: .medium))
                     }
                     .padding(.horizontal, 6)
@@ -1822,7 +1823,7 @@ struct CreateRecurringTaskSheet: View {
                         Stepper(L10n.Tasks.repeatInterval(interval: recurrenceInterval, unit: unit), value: $recurrenceInterval, in: 1...365)
                     }
 
-                    Toggle(L10n.Tasks.setDueDate, isOn: $hasDueTime)
+                    Toggle(L10n.Tasks.recurringDueTimeLabel, isOn: $hasDueTime)
                     if hasDueTime {
                         DatePicker(
                             L10n.Tasks.dateTime,
@@ -2014,7 +2015,8 @@ struct EditRecurringTaskSheet: View {
         if let dt = item.dueTime, !dt.isEmpty {
             let df = DateFormatter()
             df.dateFormat = "HH:mm"
-            if let date = df.date(from: dt) {
+            let timeStr = dt.count >= 5 ? String(dt.prefix(5)) : dt
+            if let date = df.date(from: timeStr) {
                 _hasDueTime = State(initialValue: true)
                 _dueTimeDate = State(initialValue: date)
             } else {
@@ -2063,7 +2065,7 @@ struct EditRecurringTaskSheet: View {
                         Stepper(L10n.Tasks.repeatInterval(interval: recurrenceInterval, unit: unit), value: $recurrenceInterval, in: 1...365)
                     }
 
-                    Toggle(L10n.Tasks.setDueDate, isOn: $hasDueTime)
+                    Toggle(L10n.Tasks.recurringDueTimeLabel, isOn: $hasDueTime)
                     if hasDueTime {
                         DatePicker(
                             L10n.Tasks.dateTime,

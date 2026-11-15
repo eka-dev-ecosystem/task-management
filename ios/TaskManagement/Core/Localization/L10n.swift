@@ -203,6 +203,8 @@ public enum L10n {
         public static var recurringPaused: String { "tasks.recurringPaused".localized }
         public static var recurringStatusAll: String { "tasks.recurringStatusAll".localized }
         public static func recurringDueTime(time: String) -> String { "tasks.recurringDueTime".localized(with: time) }
+        public static var recurringDueTimeLabel: String { "tasks.recurringDueTimeLabel".localized }
+        public static var setRecurringDueTime: String { "tasks.setRecurringDueTime".localized }
         public static var recurringDeleteConfirm: String { "tasks.recurringDeleteConfirm".localized }
         public static var recurringDeleteDesc: String { "tasks.recurringDeleteDesc".localized }
         public static var createRecurringTitle: String { "tasks.createRecurringTitle".localized }

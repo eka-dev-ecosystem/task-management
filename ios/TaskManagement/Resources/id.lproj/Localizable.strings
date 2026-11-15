@@ -102,6 +102,8 @@
 "tasks.recurringPaused" = "Dijeda";
 "tasks.recurringStatusAll" = "Semua";
 "tasks.recurringDueTime" = "Jatuh tempo jam %@";
+"tasks.recurringDueTimeLabel" = "Jam Deadline (Opsional)";
+"tasks.setRecurringDueTime" = "Atur Jam Deadline";
 "tasks.recurringDeleteConfirm" = "Hapus Template?";
 "tasks.recurringDeleteDesc" = "Jadwal berulang akan dihapus. Tugas yang sudah dibuat sebelumnya tidak akan terhapus.";
 "tasks.createRecurringTitle" = "Buat Template Berulang";

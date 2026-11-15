@@ -102,6 +102,8 @@
 "tasks.recurringPaused" = "Paused";
 "tasks.recurringStatusAll" = "All";
 "tasks.recurringDueTime" = "Due at %@";
+"tasks.recurringDueTimeLabel" = "Due Time (Optional)";
+"tasks.setRecurringDueTime" = "Set Due Time";
 "tasks.recurringDeleteConfirm" = "Delete Template?";
 "tasks.recurringDeleteDesc" = "This deletes the recurring schedule. Previously created tasks will remain.";
 "tasks.createRecurringTitle" = "New Recurring Template";
