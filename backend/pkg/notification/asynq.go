@@ -336,29 +336,74 @@ func (s *AsynqScheduler) ScheduleTaskRecurrence(ctx context.Context, taskID int6
 	info, err := s.client.EnqueueContext(ctx, task, asynq.ProcessAt(processAt), asynq.Queue(s.queue))
 	if err != nil && errors.Is(err, asynq.ErrTaskIDConflict) {
 		// When the task is currently active in the worker executing this recurrence trigger,
-		// Asynq returns ErrTaskIDConflict. We schedule an asynchronous re-enqueue after
-		// the worker finishes the active execution, keeping the exact clean taskIDStr without timestamp suffixes.
+		// Asynq returns ErrTaskIDConflict.
+		// 1. Immediately enqueue a fallback task with a unique timestamp suffix so the recurrence
+		// is GUARANTEED to be scheduled in Redis and never lost, regardless of how long the worker
+		// execution takes or whether the container restarts.
+		fallbackID := fmt.Sprintf("task_recurrence:%d_%d", taskID, time.Now().UnixNano())
+		fallbackTask := asynq.NewTask(
+			s.taskType,
+			payload,
+			asynq.TaskID(fallbackID),
+			asynq.MaxRetry(3),
+		)
+		fallbackInfo, fallbackErr := s.client.EnqueueContext(ctx, fallbackTask, asynq.ProcessAt(processAt), asynq.Queue(s.queue))
+		if fallbackErr != nil {
+			if s.logger != nil {
+				s.logger.Error("failed to enqueue fallback task recurrence on conflict",
+					slog.Int64("task_id", taskID),
+					slog.String("fallback_id", fallbackID),
+					slog.String("error", fallbackErr.Error()),
+				)
+			}
+			return fmt.Errorf("failed to enqueue fallback task recurrence: %w", fallbackErr)
+		}
+		if s.logger != nil {
+			s.logger.Info("fallback task recurrence successfully scheduled during active execution",
+				slog.Int64("task_id", taskID),
+				slog.String("asynq_id", fallbackInfo.ID),
+				slog.Time("process_at", processAt),
+			)
+		}
+
+		// 2. Asynchronously poll to promote to the clean ID once the active worker finishes.
 		go func() {
-			time.Sleep(1 * time.Second)
-			s.deleteTasksByPrefix(taskIDStr)
 			cleanTask := asynq.NewTask(
 				s.taskType,
 				payload,
 				asynq.TaskID(taskIDStr),
 				asynq.MaxRetry(3),
 			)
-			if _, retryErr := s.client.Enqueue(cleanTask, asynq.ProcessAt(processAt), asynq.Queue(s.queue)); retryErr != nil {
-				if s.logger != nil {
-					s.logger.Warn("failed to re-enqueue recurrence task with clean ID",
-						slog.Int64("task_id", taskID),
-						slog.String("asynq_id", taskIDStr),
-						slog.String("error", retryErr.Error()),
-					)
+			for attempt := 1; attempt <= 15; attempt++ {
+				time.Sleep(2 * time.Second)
+				if s.inspector != nil {
+					// Check if fallback task still exists; if cancelled externally, abort promotion
+					if _, err := s.inspector.GetTaskInfo(s.queue, fallbackID); err != nil {
+						return
+					}
+					// Only delete the completed/archived clean task, do NOT delete prefix matching fallbackID!
+					_ = s.inspector.DeleteTask(s.queue, taskIDStr)
 				}
-			} else if s.logger != nil {
-				s.logger.Info("recurrence successfully rescheduled with clean ID",
+				if _, retryErr := s.client.Enqueue(cleanTask, asynq.ProcessAt(processAt), asynq.Queue(s.queue)); retryErr == nil {
+					// Clean ID successfully enqueued! Safely remove the fallback task to avoid duplicate runs.
+					if s.inspector != nil {
+						_ = s.inspector.DeleteTask(s.queue, fallbackID)
+					}
+					if s.logger != nil {
+						s.logger.Info("recurrence successfully promoted to clean ID",
+							slog.Int64("task_id", taskID),
+							slog.String("asynq_id", taskIDStr),
+							slog.Time("process_at", processAt),
+							slog.Int("attempt", attempt),
+						)
+					}
+					return
+				}
+			}
+			if s.logger != nil {
+				s.logger.Info("recurrence clean ID promotion timed out, fallback task remains safely scheduled",
 					slog.Int64("task_id", taskID),
-					slog.String("asynq_id", taskIDStr),
+					slog.String("fallback_id", fallbackID),
 					slog.Time("process_at", processAt),
 				)
 			}

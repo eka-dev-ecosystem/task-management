@@ -54,6 +54,7 @@ type Service interface {
 	GetWidgetBundle(ctx context.Context, userID string) (*WidgetBundleResponse, error)
 	GetWorkspaceStats(ctx context.Context, userID string) (*WorkspaceStatsResponse, error)
 	ProcessTaskRecurrence(ctx context.Context, taskID int64) error
+	ReconcileActiveRecurringTasks(ctx context.Context) error
 
 	// Recurring Tasks methods
 	CreateRecurringTask(ctx context.Context, userID string, req CreateRecurringTaskRequest) (*RecurringTaskResponse, error)
@@ -1251,6 +1252,117 @@ func (s *service) ProcessTaskRecurrence(ctx context.Context, targetID int64) err
 	if s.logger != nil {
 		s.logger.Info("recurring task processed successfully", "recurring_id", master.ID, "task_id", created.ID)
 	}
+	return nil
+}
+
+func (s *service) ReconcileActiveRecurringTasks(ctx context.Context) error {
+	if s.recurrenceScheduler == nil {
+		return nil
+	}
+
+	var activeItems []*RecurringTaskSystemItem
+	err := s.db.WithReadOnlyTransactionCtx(ctx, func(tx *sqlx.Tx) error {
+		ctx := database.ContextWithTx(ctx, tx)
+		var err error
+		activeItems, err = s.repo.FindAllActiveRecurringSystem(ctx, tx)
+		return err
+	})
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Error("failed to load active recurring tasks for reconciliation", "error", err)
+		}
+		return err
+	}
+
+	if s.logger != nil {
+		s.logger.Info("reconciling active recurring tasks", "count", len(activeItems))
+	}
+
+	for _, item := range activeItems {
+		master := item.Master
+		tz := item.Timezone
+		if tz == "" {
+			tz = "Asia/Jakarta"
+		}
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
+			loc = time.Local
+		}
+		nowInLoc := s.now().In(loc)
+
+		// 1. Check if today is an occurrence day
+		if isOccurrenceDay(master.RecurrencePattern, master.RecurrenceInterval, nowInLoc, master.CreatedAt, loc) {
+			todayDueDate := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 23, 59, 59, 0, loc)
+			if master.DueTime != nil && *master.DueTime != "" {
+				if t, parseErr := time.Parse("15:04:05", *master.DueTime); parseErr == nil {
+					todayDueDate = time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), t.Hour(), t.Minute(), t.Second(), 0, loc)
+				} else if t, parseErr2 := time.Parse("15:04", *master.DueTime); parseErr2 == nil {
+					todayDueDate = time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), t.Hour(), t.Minute(), 0, 0, loc)
+				}
+			}
+
+			// Check if today's instance exists
+			var existing *TaskResponse
+			_ = s.db.WithReadOnlyTransactionCtx(ctx, func(tx *sqlx.Tx) error {
+				ctx := database.ContextWithTx(ctx, tx)
+				var err error
+				existing, err = s.repo.FindTodayInstance(ctx, tx, master.ID, todayDueDate)
+				return err
+			})
+
+			// If not created yet today, generate today's instance
+			if existing == nil {
+				var created *TaskResponse
+				_ = s.db.WithTransactionCtx(ctx, func(tx *sqlx.Tx) error {
+					ctx := database.ContextWithTx(ctx, tx)
+					var createErr error
+					created, createErr = s.repo.CreateInstanceFromRecurring(ctx, tx, &master, todayDueDate)
+					if createErr != nil {
+						return createErr
+					}
+					if created != nil {
+						changes, _ := json.Marshal(map[string]any{
+							"title":             created.Title,
+							"status":            created.Status,
+							"priority":          created.Priority,
+							"recurring_task_id": master.ID,
+						})
+						_, _ = s.repo.CreateActivity(ctx, tx, created.ID, master.UserID, "task_created", "Recurring task generated via reconciliation", changes)
+					}
+					return s.repo.UpdateRecurringLastGenerated(ctx, tx, master.ID, s.now())
+				})
+
+				if s.hub != nil && created != nil {
+					s.hub.Broadcast(&realtime.Message{
+						Type:   "task:recurrence_created",
+						UserID: master.UserID,
+						Data: map[string]any{
+							"recurring_task_id": master.ID,
+							"new_task_id":       created.ID,
+							"title":             created.Title,
+						},
+					})
+				}
+				if created != nil {
+					s.broadcastWidgetSyncPush(master.UserID, created.ID, "task:created")
+				}
+			}
+		}
+
+		// 2. Schedule next recurrence midnight
+		nextMidnight := getNextOccurrenceMidnight(master.RecurrencePattern, master.RecurrenceInterval, nowInLoc, tz, master.CreatedAt)
+		if master.RecurrenceEndDate == nil || !nextMidnight.After(*master.RecurrenceEndDate) {
+			if schedErr := s.recurrenceScheduler.ScheduleTaskRecurrence(ctx, master.ID, nextMidnight); schedErr != nil {
+				if s.logger != nil {
+					s.logger.Warn("failed to schedule recurrence during reconciliation",
+						"recurring_id", master.ID,
+						"error", schedErr,
+					)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

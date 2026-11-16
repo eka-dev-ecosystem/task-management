@@ -561,6 +561,12 @@ type RecurringTaskResponse struct {
 	UpdatedAt          time.Time                  `json:"updated_at" db:"updated_at"`
 }
 
+// RecurringTaskSystemItem represents an active master recurring task paired with its user's timezone.
+type RecurringTaskSystemItem struct {
+	Master   RecurringTaskResponse
+	Timezone string
+}
+
 // RecurringSubtaskResponse represents a template subtask within a recurring task.
 type RecurringSubtaskResponse struct {
 	ID              int64     `json:"id" db:"id"`

@@ -44,6 +44,7 @@ type Repository interface {
 	// Recurring Tasks repository methods
 	FindRecurringByID(ctx context.Context, tx *sqlx.Tx, userID string, id int64) (*RecurringTaskResponse, error)
 	FindRecurringByIDSystem(ctx context.Context, tx *sqlx.Tx, id int64) (*RecurringTaskResponse, string, error)
+	FindAllActiveRecurringSystem(ctx context.Context, tx *sqlx.Tx) ([]*RecurringTaskSystemItem, error)
 	FindAllRecurring(ctx context.Context, tx *sqlx.Tx, userID string) ([]RecurringTaskResponse, error)
 	CreateRecurring(ctx context.Context, tx *sqlx.Tx, userID string, req CreateRecurringTaskRequest) (*RecurringTaskResponse, error)
 	UpdateRecurring(ctx context.Context, tx *sqlx.Tx, userID string, id int64, req UpdateRecurringTaskRequest) (*RecurringTaskResponse, error)
@@ -1367,6 +1368,49 @@ func (r *repository) FindRecurringByIDSystem(ctx context.Context, tx *sqlx.Tx, i
 		tz = "Asia/Jakarta"
 	}
 	return &res, tz, nil
+}
+
+func (r *repository) FindAllActiveRecurringSystem(ctx context.Context, tx *sqlx.Tx) ([]*RecurringTaskSystemItem, error) {
+	if tx == nil {
+		return nil, errors.New("transaction is required")
+	}
+	query := `
+		SELECT 
+			rt.id, rt.user_id, rt.project_id, p.name as project_name, p.color as project_color,
+			rt.title, rt.description, rt.priority, rt.recurrence_pattern, rt.recurrence_interval,
+			to_char(rt.due_time, 'HH24:MI:SS') as due_time, rt.recurrence_end_date, rt.is_active, rt.last_generated_at,
+			rt.created_at, rt.updated_at,
+			COALESCE(u.timezone, 'Asia/Jakarta') as timezone
+		FROM recurring_tasks rt
+		JOIN users u ON u.id = rt.user_id
+		LEFT JOIN projects p ON p.id = rt.project_id
+		WHERE rt.is_active = true
+		ORDER BY rt.id ASC
+	`
+	type sysRecEntity struct {
+		recurringTaskEntity
+		Timezone string `db:"timezone"`
+	}
+	var entities []sysRecEntity
+	err := tx.SelectContext(ctx, &entities, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find all active recurring tasks: %w", err)
+	}
+
+	results := make([]*RecurringTaskSystemItem, len(entities))
+	for i, e := range entities {
+		subtasks, _ := r.fetchRecurringSubtasks(ctx, tx, e.ID)
+		tz := e.Timezone
+		if tz == "" {
+			tz = "Asia/Jakarta"
+		}
+		master := e.recurringTaskEntity.toResponse(subtasks)
+		results[i] = &RecurringTaskSystemItem{
+			Master:   master,
+			Timezone: tz,
+		}
+	}
+	return results, nil
 }
 
 func (r *repository) FindAllRecurring(ctx context.Context, tx *sqlx.Tx, userID string) ([]RecurringTaskResponse, error) {

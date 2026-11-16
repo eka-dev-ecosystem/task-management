@@ -4,6 +4,9 @@
 package module
 
 import (
+	"context"
+	"time"
+
 	"golang/config"
 	"golang/database"
 	authmodule "golang/internal/module/auth"
@@ -129,6 +132,15 @@ func (r *Router) registerNotesAndTasks(api fiber.Router) {
 	if r.AsynqScheduler != nil {
 		logger := logging.Logger()
 		taskService.SetNotificationDependencies(r.AsynqScheduler, r.EmailSender, r.PushSender, r.ReminderRepo, r.Hub, logger)
+		// Background self-healing reconciliation on startup
+		go func() {
+			time.Sleep(3 * time.Second)
+			if err := taskService.ReconcileActiveRecurringTasks(context.Background()); err != nil {
+				logger.Warn("background recurring task reconciliation failed on startup", logging.Err(err))
+			} else {
+				logger.Info("background recurring task reconciliation completed on startup")
+			}
+		}()
 	}
 	taskHandler := task.NewHandler(taskService)
 
@@ -151,6 +163,7 @@ func (r *Router) registerNotesAndTasks(api fiber.Router) {
 	api.Post("/tasks/due-warning/trigger", taskHandler.TriggerDueWarning(webhookSecret))
 	// External Asynq worker webhook trigger endpoint for recurring task midnight rollover (Public/Secret-protected)
 	api.Post("/tasks/recurrence/trigger", taskHandler.TriggerRecurrence(webhookSecret))
+	api.Post("/tasks/recurrence/reconcile", taskHandler.ReconcileRecurrence(webhookSecret))
 
 	// Notes routes (Per-user isolated)
 	notes := api.Group("/notes")

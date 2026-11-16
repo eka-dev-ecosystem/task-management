@@ -55,6 +55,7 @@ type mockRepository struct {
 
 	findRecurringByIDFunc            func(ctx context.Context, userID string, id int64) (*RecurringTaskResponse, error)
 	findRecurringByIDSystemFunc      func(ctx context.Context, id int64) (*RecurringTaskResponse, string, error)
+	findAllActiveRecurringSystemFunc func(ctx context.Context) ([]*RecurringTaskSystemItem, error)
 	findAllRecurringFunc             func(ctx context.Context, userID string) ([]RecurringTaskResponse, error)
 	createRecurringFunc              func(ctx context.Context, userID string, req CreateRecurringTaskRequest) (*RecurringTaskResponse, error)
 	updateRecurringFunc              func(ctx context.Context, userID string, id int64, req UpdateRecurringTaskRequest) (*RecurringTaskResponse, error)
@@ -233,6 +234,13 @@ func (m *mockRepository) FindRecurringByIDSystem(ctx context.Context, tx *sqlx.T
 		return m.findRecurringByIDSystemFunc(ctx, id)
 	}
 	return nil, "Asia/Jakarta", nil
+}
+
+func (m *mockRepository) FindAllActiveRecurringSystem(ctx context.Context, tx *sqlx.Tx) ([]*RecurringTaskSystemItem, error) {
+	if m.findAllActiveRecurringSystemFunc != nil {
+		return m.findAllActiveRecurringSystemFunc(ctx)
+	}
+	return []*RecurringTaskSystemItem{}, nil
 }
 
 func (m *mockRepository) FindAllRecurring(ctx context.Context, tx *sqlx.Tx, userID string) ([]RecurringTaskResponse, error) {
@@ -2427,6 +2435,71 @@ func TestTaskService_BroadcastWidgetSyncPush_SilentPush(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Errorf("timed out waiting for silent push notification on task creation")
+	}
+}
+
+func TestTaskService_ReconcileActiveRecurringTasks(t *testing.T) {
+	ctx := context.Background()
+	taskID := int64(101)
+	userID := "user-reconcile-123"
+
+	var instanceCreated bool
+
+	mockRepo := &mockRepository{
+		findAllActiveRecurringSystemFunc: func(ctx context.Context) ([]*RecurringTaskSystemItem, error) {
+			return []*RecurringTaskSystemItem{
+				{
+					Master: RecurringTaskResponse{
+						ID:                 taskID,
+						UserID:             userID,
+						Title:              "Daily Standup",
+						RecurrencePattern:  "daily",
+						RecurrenceInterval: 1,
+						IsActive:           true,
+						CreatedAt:          time.Now().Add(-48 * time.Hour),
+					},
+					Timezone: "Asia/Jakarta",
+				},
+			}, nil
+		},
+		findTodayInstanceFunc: func(ctx context.Context, recID int64, todayDate time.Time) (*TaskResponse, error) {
+			return nil, nil
+		},
+		createInstanceFromRecurringFunc: func(ctx context.Context, master *RecurringTaskResponse, dueDate time.Time) (*TaskResponse, error) {
+			instanceCreated = true
+			return &TaskResponse{
+				ID:              999,
+				Title:           master.Title,
+				RecurringTaskID: &master.ID,
+			}, nil
+		},
+		createActivityFunc: func(ctx context.Context, tID int64, uID string, actType string, desc string, ch []byte) (*TaskActivityResponse, error) {
+			return &TaskActivityResponse{ID: 1}, nil
+		},
+		updateRecurringLastGeneratedFunc: func(ctx context.Context, id int64, tm time.Time) error {
+			return nil
+		},
+	}
+
+	scheduler := newMockTaskScheduler()
+
+	svc := NewService(mockRepo, &mockTransactor{})
+	svc.SetNotificationDependencies(scheduler, nil, nil, nil, nil, nil)
+
+	err := svc.ReconcileActiveRecurringTasks(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error reconciling: %v", err)
+	}
+
+	if !instanceCreated {
+		t.Errorf("expected today's instance to be created during reconciliation")
+	}
+	scheduledAt, ok := scheduler.recurrenceScheduled[taskID]
+	if !ok {
+		t.Errorf("expected task %d to be scheduled in recurrenceScheduled map", taskID)
+	}
+	if scheduledAt.IsZero() {
+		t.Errorf("expected scheduledAt time to be non-zero")
 	}
 }
 

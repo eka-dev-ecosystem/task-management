@@ -392,6 +392,37 @@ func (h *Handler) TriggerRecurrence(webhookSecret string) fiber.Handler {
 	}
 }
 
+// ReconcileRecurrence allows external triggers or admins to reconcile all active recurring tasks.
+func (h *Handler) ReconcileRecurrence(webhookSecret string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		incomingSecret := c.Get("X-Internal-Token")
+		if incomingSecret == "" {
+			incomingSecret = c.Get("X-Webhook-Secret")
+		}
+		if incomingSecret == "" {
+			incomingSecret = c.Get("X-Reminder-Secret")
+		}
+		if incomingSecret == "" {
+			authHeader := c.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				incomingSecret = strings.TrimPrefix(authHeader, "Bearer ")
+			} else {
+				incomingSecret = authHeader
+			}
+		}
+
+		if incomingSecret == "" || webhookSecret == "" || incomingSecret != webhookSecret {
+			return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized: missing or invalid webhook secret")
+		}
+
+		if err := h.service.ReconcileActiveRecurringTasks(c.UserContext()); err != nil {
+			return err
+		}
+
+		return response.SuccessMessageResponse(c, "Recurring tasks reconciled successfully")
+	}
+}
+
 func (h *Handler) GetWidgetBundle(c *fiber.Ctx) error {
 	userID, err := authMiddleware.GetUserID(c)
 	if err != nil {
