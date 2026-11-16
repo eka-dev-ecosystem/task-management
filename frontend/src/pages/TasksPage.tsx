@@ -8,11 +8,12 @@ import { TaskFilterBar } from '@/features/tasks/TaskFilterBar'
 import { TaskFocusHorizon } from '@/features/tasks/TaskFocusHorizon'
 import { TaskListView } from '@/features/tasks/TaskListView'
 import { TaskModal } from '@/features/tasks/TaskModal'
-import { useTasks } from '@/hooks'
+import { useTaskFiltersUrlSync, useTasks } from '@/hooks'
 import { useTranslation } from '@/i18n'
 import { useTaskStore } from '@/stores'
 
 export const TasksPage: React.FC = () => {
+  useTaskFiltersUrlSync()
   const { activeView } = useTaskStore()
   const { data: rawTasks } = useTasks()
   const tasks = Array.isArray(rawTasks) ? rawTasks : []

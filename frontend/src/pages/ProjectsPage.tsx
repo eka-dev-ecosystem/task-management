@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react'
 import { ProjectsSkeleton } from '@/components'
 import { ProjectAccordionItem, ProjectModal } from '@/features/projects'
 import { TaskDetailModal, TaskModal } from '@/features/tasks'
-import { useProjects, useTasks } from '@/hooks'
+import { useProjects, useTasks, useUrlQueryState } from '@/hooks'
 import { useTranslation } from '@/i18n'
 import type { Project } from '@/types'
 
@@ -33,7 +33,7 @@ export const ProjectsPage: React.FC = () => {
     [projectTasks.length, completedProjectTasks]
   )
 
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useUrlQueryState('search', '', { debounceMs: 300 })
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)

@@ -9,7 +9,8 @@ import {
   useCalendarGraphQL,
   useDebounce,
   useDismissReminder,
-  useSnoozeReminder
+  useSnoozeReminder,
+  useUrlQueryState
 } from '@/hooks'
 import { useTranslation } from '@/i18n'
 import { useTaskStore, useUIStore } from '@/stores'
@@ -40,8 +41,8 @@ export const CalendarPage: React.FC = () => {
 
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [selectedDate, setSelectedDate] = useState(() => new Date())
-  const [viewMode, setViewMode] = useState<CalendarViewMode>('month')
-  const [filterType, setFilterType] = useState<FilterType>('all')
+  const [viewMode, setViewMode] = useUrlQueryState<CalendarViewMode>('view', 'month')
+  const [filterType, setFilterType] = useUrlQueryState<FilterType>('filter', 'all')
 
   // Calculate range for query
   const queryRange = useMemo(() => {

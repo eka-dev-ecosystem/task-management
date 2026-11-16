@@ -9,7 +9,8 @@ import {
   useProjects,
   useRecurringTasks,
   useToggleActiveRecurringTask,
-  useUpdateRecurringTask
+  useUpdateRecurringTask,
+  useUrlQueryState
 } from '@/hooks'
 import { useTranslation } from '@/i18n'
 import type {
@@ -112,8 +113,11 @@ export const RecurringTasksManagementView: React.FC = () => {
   const createMutation = useCreateRecurringTask()
   const updateMutation = useUpdateRecurringTask()
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterActiveOnly, setFilterActiveOnly] = useState<'all' | 'active' | 'paused'>('all')
+  const [searchQuery, setSearchQuery] = useUrlQueryState('search', '', { debounceMs: 300 })
+  const [filterActiveOnly, setFilterActiveOnly] = useUrlQueryState<'all' | 'active' | 'paused'>(
+    'recurring_status',
+    'all'
+  )
 
   // Modal State (Create / Edit)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -175,7 +179,7 @@ export const RecurringTasksManagementView: React.FC = () => {
   }
 
   const handleRemoveSubtask = (index: number) => {
-    setFormSubtasks(formSubtasks.filter((_, i) => i !== index))
+    setFormSubtasks(formSubtasks.filter((_, i) => i !== index)) // eslint-disable-line @typescript-eslint/naming-convention
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -241,8 +245,7 @@ export const RecurringTasksManagementView: React.FC = () => {
     })
   }
 
-  const filteredTemplates = useMemo(() => {
-    return templates.filter((tpl) => {
+  const filteredTemplates = useMemo(() => templates.filter((tpl) => {
       if (filterActiveOnly === 'active' && !tpl.is_active) return false
       if (filterActiveOnly === 'paused' && tpl.is_active) return false
       if (searchQuery.trim()) {
@@ -253,8 +256,7 @@ export const RecurringTasksManagementView: React.FC = () => {
         if (!matchesTitle && !matchesDesc && !matchesProject) return false
       }
       return true
-    })
-  }, [templates, filterActiveOnly, searchQuery])
+    }), [templates, filterActiveOnly, searchQuery])
 
   const activeCount = useMemo(() => templates.filter((t) => t.is_active).length, [templates])
   const pausedCount = useMemo(() => templates.filter((t) => !t.is_active).length, [templates])

@@ -1,7 +1,14 @@
 import React, { useState } from 'react'
 
 import { confirmDialog, NotesSkeleton } from '@/components'
-import { useConvertToTask, useCreateNote, useDeleteNote, useNotes, useUpdateNote } from '@/hooks'
+import {
+  useConvertToTask,
+  useCreateNote,
+  useDeleteNote,
+  useNotes,
+  useUpdateNote,
+  useUrlQueryState
+} from '@/hooks'
 import { useTranslation } from '@/i18n'
 import type {
   ConvertToTaskPayload,
@@ -16,8 +23,8 @@ import { NoteCard } from './NoteCard'
 import { NoteModal } from './NoteModal'
 
 export const NoteGrid: React.FC = () => {
-  const [activeTag, setActiveTag] = useState('')
-  const [activeType, setActiveType] = useState<'' | 'actionable' | 'knowledge'>('')
+  const [activeTag, setActiveTag] = useUrlQueryState('tag', '')
+  const [activeType, setActiveType] = useUrlQueryState<'' | 'actionable' | 'knowledge'>('type', '')
   const { data: rawAllNotes } = useNotes()
 
   const filterParams: NoteFilterParams = {}

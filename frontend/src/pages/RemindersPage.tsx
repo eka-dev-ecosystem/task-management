@@ -4,7 +4,13 @@ import { useNavigate } from 'react-router-dom'
 import { taskApi } from '@/api'
 import { confirmDialog, RemindersSkeleton } from '@/components'
 import { ReminderModal } from '@/features/reminder'
-import { useDeleteReminder, useDismissReminder, useReminders, useSnoozeReminder } from '@/hooks'
+import {
+  useDeleteReminder,
+  useDismissReminder,
+  useReminders,
+  useSnoozeReminder,
+  useUrlQueryState
+} from '@/hooks'
 import { useTranslation } from '@/i18n'
 import { useTaskStore } from '@/stores'
 import type { Reminder } from '@/types'
@@ -16,8 +22,8 @@ export default function RemindersPage() {
   const navigate = useNavigate()
   const { openDrawer } = useTaskStore()
 
-  const [activeTab, setActiveTab] = useState<FilterTab>('all')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useUrlQueryState<FilterTab>('status', 'all')
+  const [searchQuery, setSearchQuery] = useUrlQueryState('search', '', { debounceMs: 300 })
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null)
 
