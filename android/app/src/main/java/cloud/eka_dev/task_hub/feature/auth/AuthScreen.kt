@@ -3,6 +3,7 @@ package cloud.eka_dev.task_hub.feature.auth
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -54,9 +55,42 @@ fun AuthScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 40.dp)
+                .padding(horizontal = 24.dp, vertical = 20.dp)
         ) {
-            Spacer(modifier = Modifier.height(20.dp))
+            // Language Switcher (Top Right)
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                val currentLang by LanguageManager.currentLanguage.collectAsState()
+                Surface(
+                    onClick = { LanguageManager.toggleLanguage() },
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = if (currentLang == "id") "🇮🇩 ID" else "🇺🇸 EN",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Icon(
+                            Icons.Default.Language,
+                            contentDescription = "Switch Language",
+                            tint = BrandPrimary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Brand Logo & Header
             BrandLogo(size = 80.dp)

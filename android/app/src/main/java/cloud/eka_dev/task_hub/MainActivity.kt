@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
+import cloud.eka_dev.task_hub.core.designsystem.LanguageManager
+import cloud.eka_dev.task_hub.core.designsystem.ProvideAppLocale
 import cloud.eka_dev.task_hub.core.designsystem.SplashScreen
 import cloud.eka_dev.task_hub.core.designsystem.TaskManagementTheme
 import cloud.eka_dev.task_hub.feature.auth.AuthScreen
@@ -46,6 +48,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         handleDeepLink(intent)
         val app = application as TaskApp
+        LanguageManager.initialize(app.tokenManager)
 
         val authViewModel = AuthViewModel(app.apiClient, app.tokenManager)
         val taskViewModel = TaskViewModel(app.apiClient)
@@ -57,11 +60,14 @@ class MainActivity : ComponentActivity() {
         val mcpViewModel = McpViewModel(app.apiClient)
 
         setContent {
-            TaskManagementTheme {
-                val tokenState by app.tokenManager.accessTokenFlow.collectAsState(initial = "loading")
-                var splashCompleted by remember { mutableStateOf(false) }
+            val currentLanguage by LanguageManager.currentLanguage.collectAsState()
 
-                Box(modifier = Modifier.fillMaxSize()) {
+            ProvideAppLocale(language = currentLanguage) {
+                TaskManagementTheme {
+                    val tokenState by app.tokenManager.accessTokenFlow.collectAsState(initial = "loading")
+                    var splashCompleted by remember { mutableStateOf(false) }
+
+                    Box(modifier = Modifier.fillMaxSize()) {
                     if (tokenState != "loading") {
                         if (tokenState.isNullOrEmpty()) {
                             AuthScreen(
@@ -111,6 +117,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
     }
 
     override fun onNewIntent(intent: Intent) {

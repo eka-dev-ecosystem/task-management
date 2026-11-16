@@ -1,6 +1,7 @@
 package cloud.eka_dev.task_hub.feature.task
 
 import android.content.Context
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -124,33 +125,90 @@ fun TaskListScreen(
                     )
                 )
 
-                // Tab Switcher (Tasks vs Recurring)
-                TabRow(
-                    selectedTabIndex = uiState.selectedTab,
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = BrandPrimary,
-                    divider = { Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)) }
+                // Segmented Pill Tab Switcher (Tasks vs Recurring)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(3.dp)
                 ) {
-                    Tab(
-                        selected = uiState.selectedTab == 0,
-                        onClick = { viewModel.setSelectedTab(0) },
-                        text = {
-                            Text(
-                                stringResource(R.string.tab_tasks),
-                                fontWeight = if (uiState.selectedTab == 0) FontWeight.Bold else FontWeight.Normal
-                            )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Tasks Tab
+                        val isTasksSelected = uiState.selectedTab == 0
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(9.dp))
+                                .then(
+                                    if (isTasksSelected) Modifier.background(BrandGradientBrush)
+                                    else Modifier
+                                )
+                                .clickable { viewModel.setSelectedTab(0) }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Checklist,
+                                    contentDescription = null,
+                                    tint = if (isTasksSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "${stringResource(R.string.tab_tasks)} (${uiState.tasks.size})",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isTasksSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isTasksSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                    )
-                    Tab(
-                        selected = uiState.selectedTab == 1,
-                        onClick = { viewModel.setSelectedTab(1) },
-                        text = {
-                            Text(
-                                stringResource(R.string.tab_recurring),
-                                fontWeight = if (uiState.selectedTab == 1) FontWeight.Bold else FontWeight.Normal
-                            )
+
+                        // Recurring Tab
+                        val isRecurringSelected = uiState.selectedTab == 1
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(9.dp))
+                                .then(
+                                    if (isRecurringSelected) Modifier.background(BrandGradientBrush)
+                                    else Modifier
+                                )
+                                .clickable { viewModel.setSelectedTab(1) }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Repeat,
+                                    contentDescription = null,
+                                    tint = if (isRecurringSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "${stringResource(R.string.tab_recurring)} (${uiState.recurringTasks.size})",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isRecurringSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isRecurringSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                    )
+                    }
                 }
             }
         },
@@ -374,7 +432,10 @@ fun TaskListScreen(
                                 },
                                 onStatusToggle = { viewModel.toggleTaskStatus(task) },
                                 onFocusToggle = { viewModel.toggleTaskFocus(task) },
-                                onStatusChange = { newStatus -> viewModel.updateTaskStatus(task, newStatus) }
+                                onStatusChange = { newStatus -> viewModel.updateTaskStatus(task, newStatus) },
+                                onSubtaskToggle = { subtaskId, isCompleted ->
+                                    viewModel.toggleSubtask(task.id, subtaskId, isCompleted)
+                                }
                             )
                         }
 
@@ -602,11 +663,9 @@ fun RecurringTaskCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    AppCard(
+        modifier = modifier,
+        onClick = onEdit
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -716,13 +775,32 @@ fun RecurringTaskCard(
                 )
             }
 
-            // Subtasks preview
+            // Subtasks badge preview
             if (item.subtasks.isNotEmpty()) {
-                Text(
-                    stringResource(R.string.subtasks_count, item.subtasks.size, item.subtasks.size),
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Checklist,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            stringResource(R.string.recurring_subtasks_count, item.subtasks.size),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
 
             Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))

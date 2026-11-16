@@ -77,7 +77,10 @@ data class Task(
     @SerialName("subtasks_count") val subtasksCount: Int = 0,
     @SerialName("subtasks_completed") val subtasksCompleted: Int = 0,
     @SerialName("subtasks_cancelled") val subtasksCancelled: Int = 0,
-    @SerialName("progress_percent") val progressPercent: Int = 0
+    @SerialName("progress_percent") val progressPercent: Int = 0,
+    @SerialName("is_recurring") val isRecurring: Boolean = false,
+    @SerialName("recurrence_pattern") val recurrencePattern: String? = null,
+    @SerialName("recurring_task_id") val recurringTaskId: Long? = null
 )
 
 @Serializable

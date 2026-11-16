@@ -29,8 +29,10 @@ import androidx.lifecycle.viewModelScope
 import cloud.eka_dev.task_hub.R
 import cloud.eka_dev.task_hub.core.datastore.TokenManager
 import cloud.eka_dev.task_hub.core.designsystem.AppButton
+import cloud.eka_dev.task_hub.core.designsystem.AppCard
 import cloud.eka_dev.task_hub.core.designsystem.BrandLogo
 import cloud.eka_dev.task_hub.core.designsystem.BrandPrimary
+import cloud.eka_dev.task_hub.core.designsystem.LanguageManager
 import cloud.eka_dev.task_hub.core.model.*
 import cloud.eka_dev.task_hub.core.network.ApiClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -303,6 +305,49 @@ fun ProfileScreen(
 
                     IconButton(onClick = { showEditNameDialog = true }) {
                         Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.change_name), tint = BrandPrimary)
+                    }
+                }
+            }
+
+            // Appearance & Language Card
+            AppCard(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.settings_appearance),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+
+                    val currentLanguage by LanguageManager.currentLanguage.collectAsState()
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            stringResource(R.string.settings_language),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = currentLanguage == "id",
+                                onClick = { LanguageManager.setLanguage("id") },
+                                leadingIcon = { Text("🇮🇩", fontSize = 14.sp) },
+                                label = { Text(stringResource(R.string.language_indonesian), fontSize = 12.sp) }
+                            )
+                            FilterChip(
+                                selected = currentLanguage == "en",
+                                onClick = { LanguageManager.setLanguage("en") },
+                                leadingIcon = { Text("🇺🇸", fontSize = 14.sp) },
+                                label = { Text(stringResource(R.string.language_english), fontSize = 12.sp) }
+                            )
+                        }
                     }
                 }
             }

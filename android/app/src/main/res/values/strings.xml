@@ -262,4 +262,20 @@
     <string name="filter_completed">Completed</string>
     <string name="delete_reminder_confirm_title">Delete Reminder?</string>
     <string name="delete_reminder_confirm_desc">Are you sure you want to delete this reminder?</string>
+
+    <!-- Appearance & Language -->
+    <string name="settings_appearance">Appearance &amp; Language</string>
+    <string name="settings_language">Language</string>
+    <string name="language_english">English (US)</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_en_short">EN</string>
+    <string name="language_id_short">ID</string>
+    <string name="start_working">Start Working</string>
+    <string name="reopen_task">Reopen</string>
+    <string name="log_history">History</string>
+    <string name="overdue_label">Overdue</string>
+    <string name="today_label">Today</string>
+    <string name="recurring_badge">Recurring</string>
+    <string name="subtasks_more">+%1$d more...</string>
+    <string name="recurring_subtasks_count">%1$d Subtasks</string>
 </resources>

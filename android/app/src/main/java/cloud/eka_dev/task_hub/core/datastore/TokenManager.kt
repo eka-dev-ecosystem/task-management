@@ -17,6 +17,21 @@ class TokenManager(private val context: Context) {
         val USER_ID_KEY = stringPreferencesKey("user_id")
         val USER_NAME_KEY = stringPreferencesKey("user_name")
         val USER_EMAIL_KEY = stringPreferencesKey("user_email")
+        val APP_LANGUAGE_KEY = stringPreferencesKey("app_language")
+    }
+
+    val appLanguageFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[APP_LANGUAGE_KEY] ?: "id"
+    }
+
+    suspend fun getAppLanguage(): String {
+        return context.dataStore.data.map { it[APP_LANGUAGE_KEY] ?: "id" }.first()
+    }
+
+    suspend fun saveAppLanguage(lang: String) {
+        context.dataStore.edit { prefs ->
+            prefs[APP_LANGUAGE_KEY] = lang
+        }
     }
 
     val accessTokenFlow: Flow<String?> = context.dataStore.data.map { prefs ->

@@ -262,4 +262,20 @@
     <string name="filter_completed">Selesai</string>
     <string name="delete_reminder_confirm_title">Hapus Pengingat?</string>
     <string name="delete_reminder_confirm_desc">Apakah Anda yakin ingin menghapus pengingat ini?</string>
+
+    <!-- Appearance & Language -->
+    <string name="settings_appearance">Tampilan &amp; Bahasa</string>
+    <string name="settings_language">Bahasa Aplikasi</string>
+    <string name="language_english">English (US)</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_en_short">EN</string>
+    <string name="language_id_short">ID</string>
+    <string name="start_working">Mulai Bekerja</string>
+    <string name="reopen_task">Buka Kembali</string>
+    <string name="log_history">Riwayat</string>
+    <string name="overdue_label">Terlambat</string>
+    <string name="today_label">Hari Ini</string>
+    <string name="recurring_badge">Berulang</string>
+    <string name="subtasks_more">+%1$d lainnya...</string>
+    <string name="recurring_subtasks_count">%1$d Subtask</string>
 </resources>

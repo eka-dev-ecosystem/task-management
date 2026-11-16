@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -27,11 +28,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.eka_dev.task_hub.R
 import cloud.eka_dev.task_hub.core.model.Task
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun BrandLogo(size: Dp = 36.dp) {
@@ -169,21 +174,78 @@ fun ProjectPill(name: String, colorHex: String?) {
 }
 
 @Composable
+fun AppCard(
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(16.dp),
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    elevation: Dp = 1.5.dp,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val borderColor = if (isSystemInDarkTheme()) {
+        Color.White.copy(alpha = 0.08f)
+    } else {
+        Color.Black.copy(alpha = 0.06f)
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick
+                ) else Modifier
+            ),
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation),
+        border = BorderStroke(1.dp, borderColor),
+        content = content
+    )
+}
+
+private fun parseLocalDate(dateStr: String?): LocalDate? {
+    if (dateStr.isNullOrBlank()) return null
+    return try {
+        val clean = dateStr.trim().take(10)
+        LocalDate.parse(clean)
+    } catch (e: Exception) {
+        null
+    }
+}
+
+fun isDateOverdue(dueDate: String?): Boolean {
+    val date = parseLocalDate(dueDate) ?: return false
+    return date.isBefore(LocalDate.now())
+}
+
+fun isDateToday(dueDate: String?): Boolean {
+    val date = parseLocalDate(dueDate) ?: return false
+    return date.isEqual(LocalDate.now())
+}
+
+fun formatDueDatePretty(dueDate: String?): String {
+    val date = parseLocalDate(dueDate) ?: return dueDate?.take(10) ?: ""
+    return date.format(DateTimeFormatter.ofPattern("dd/MM"))
+}
+
+@Composable
 fun TaskItemCard(
         task: Task,
         onTaskClick: () -> Unit,
         onStatusToggle: () -> Unit,
         onFocusToggle: () -> Unit = {},
         onStatusChange: (String) -> Unit = {},
+        onSubtaskToggle: ((Long, Boolean) -> Unit)? = null,
         modifier: Modifier = Modifier
 ) {
     val isDone = task.status == "done"
 
-    Card(
-            modifier = modifier.fillMaxWidth().clickable { onTaskClick() },
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    AppCard(
+        modifier = modifier,
+        onClick = onTaskClick
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
@@ -226,6 +288,7 @@ fun TaskItemCard(
                                 text = task.title,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
+                                textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None,
                                 color =
                                         if (isDone) MaterialTheme.colorScheme.onSurfaceVariant
                                         else MaterialTheme.colorScheme.onSurface
@@ -240,7 +303,7 @@ fun TaskItemCard(
                         }
                     }
 
-                    // Project & Tags
+                    // Project, Recurring Badge & Tags
                     Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -248,6 +311,30 @@ fun TaskItemCard(
                     ) {
                         if (!task.projectName.isNullOrEmpty()) {
                             ProjectPill(name = task.projectName, colorHex = task.projectColor)
+                        }
+                        if (task.isRecurring) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(BrandPrimary.copy(alpha = 0.12f))
+                                    .border(1.dp, BrandPrimary.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.5.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Repeat,
+                                    contentDescription = null,
+                                    tint = BrandPrimary,
+                                    modifier = Modifier.size(10.dp)
+                                )
+                                Text(
+                                    stringResource(R.string.recurring_badge),
+                                    color = BrandPrimary,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                         task.tags.take(2).forEach { tag ->
                             Text(
@@ -317,6 +404,57 @@ fun TaskItemCard(
                     }
 
                     PriorityBadge(priority = task.priority)
+                }
+            }
+
+            // Interactive Subtasks Checklist Preview (First 3 items, matching iOS)
+            if (task.subtasks.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    task.subtasks.take(3).forEach { st ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSubtaskToggle?.invoke(st.id, st.isCompleted)
+                                }
+                        ) {
+                            Icon(
+                                imageVector = if (st.isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                contentDescription = null,
+                                tint = if (st.isCompleted) StatusDone else MaterialTheme.colorScheme.outlineVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = st.title,
+                                fontSize = 12.sp,
+                                textDecoration = if (st.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                color = if (st.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    if (task.subtasks.size > 3) {
+                        Text(
+                            text = stringResource(R.string.subtasks_more, task.subtasks.size - 3),
+                            fontSize = 11.sp,
+                            fontStyle = FontStyle.Italic,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 24.dp)
+                        )
+                    }
                 }
             }
 
@@ -666,7 +804,7 @@ fun TaskItemCard(
                                             modifier = Modifier.size(10.dp)
                                     )
                                     Text(
-                                            stringResource(R.string.quick_action_redo),
+                                            stringResource(R.string.reopen_task),
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = StatusInProgress
@@ -682,20 +820,54 @@ fun TaskItemCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (!task.dueDate.isNullOrEmpty()) {
+                        val isOverdue = isDateOverdue(task.dueDate)
+                        val isToday = isDateToday(task.dueDate)
+                        val prettyDate = formatDueDatePretty(task.dueDate)
+
+                        val badgeColor = when {
+                            isOverdue -> Color(0xFFF43F5E)
+                            isToday -> Color(0xFFF59E0B)
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        val badgeBg = when {
+                            isOverdue -> Color(0xFFF43F5E).copy(alpha = 0.12f)
+                            isToday -> Color(0xFFF59E0B).copy(alpha = 0.12f)
+                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        }
+                        val badgeBorder = when {
+                            isOverdue -> Color(0xFFF43F5E).copy(alpha = 0.25f)
+                            isToday -> Color(0xFFF59E0B).copy(alpha = 0.25f)
+                            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                        }
+
                         Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(badgeBg)
+                                .border(1.dp, badgeBorder, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.5.dp)
                         ) {
                             Icon(
-                                    Icons.Default.CalendarToday,
-                                    contentDescription = null,
-                                    tint = PriorityUrgent,
-                                    modifier = Modifier.size(11.dp)
+                                imageVector = when {
+                                    isOverdue -> Icons.Default.Warning
+                                    isToday -> Icons.Default.Schedule
+                                    else -> Icons.Default.CalendarToday
+                                },
+                                contentDescription = null,
+                                tint = badgeColor,
+                                modifier = Modifier.size(10.dp)
                             )
                             Text(
-                                    text = task.dueDate.take(10),
-                                    fontSize = 11.sp,
-                                    color = PriorityUrgent
+                                text = when {
+                                    isOverdue -> if (prettyDate.isNotEmpty()) "${stringResource(R.string.overdue_label)} ($prettyDate)" else stringResource(R.string.overdue_label)
+                                    isToday -> stringResource(R.string.today_label)
+                                    else -> prettyDate
+                                },
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = badgeColor
                             )
                         }
                     }
