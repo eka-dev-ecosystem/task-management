@@ -39,6 +39,7 @@ type Repository interface {
 
 	GetWidgetBundle(ctx context.Context, tx *sqlx.Tx, userID string) (*WidgetBundleResponse, error)
 	GetWorkspaceStats(ctx context.Context, tx *sqlx.Tx, userID string) (*WorkspaceStatsResponse, error)
+	GetTaskMetrics(ctx context.Context, tx *sqlx.Tx, userID string, projectID *int64) (*TaskStatusMetricsResponse, error)
 	UpdateRecurrenceGeneratedAt(ctx context.Context, tx *sqlx.Tx, id int64, t time.Time) error
 
 	// Recurring Tasks repository methods
@@ -1280,6 +1281,36 @@ func (r *repository) GetWorkspaceStats(ctx context.Context, tx *sqlx.Tx, userID 
 		return nil, fmt.Errorf("failed to fetch workspace stats: %w", err)
 	}
 	return &stats, nil
+}
+
+func (r *repository) GetTaskMetrics(ctx context.Context, tx *sqlx.Tx, userID string, projectID *int64) (*TaskStatusMetricsResponse, error) {
+	if tx == nil {
+		return nil, errors.New("transaction is required")
+	}
+	query := `
+		SELECT
+			COALESCE(COUNT(id), 0) AS total,
+			COALESCE(COUNT(CASE WHEN status = 'todo' THEN 1 END), 0) AS todo,
+			COALESCE(COUNT(CASE WHEN status = 'in_progress' THEN 1 END), 0) AS in_progress,
+			COALESCE(COUNT(CASE WHEN status = 'review' THEN 1 END), 0) AS review,
+			COALESCE(COUNT(CASE WHEN status = 'backlog' THEN 1 END), 0) AS backlog,
+			COALESCE(COUNT(CASE WHEN status = 'done' THEN 1 END), 0) AS done
+		FROM tasks
+		WHERE user_id = $1
+	`
+	var args []interface{}
+	args = append(args, userID)
+	if projectID != nil && *projectID > 0 {
+		query += fmt.Sprintf(" AND project_id = $%d", len(args)+1)
+		args = append(args, *projectID)
+	}
+
+	var res TaskStatusMetricsResponse
+	err := tx.GetContext(ctx, &res, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch task metrics: %w", err)
+	}
+	return &res, nil
 }
 
 // --- Recurring Tasks Repository Implementation ---

@@ -180,6 +180,7 @@ func (r *Router) registerNotesAndTasks(api fiber.Router) {
 	tasks.Use(authMiddleware.AuthMiddleware(r.JWTService))
 	tasks.Get("/widgets/bundle", taskHandler.GetWidgetBundle)
 	tasks.Get("/stats", taskHandler.GetWorkspaceStats)
+	tasks.Get("/metrics", taskHandler.GetMetrics)
 	tasks.Post("/", taskHandler.Create)
 	tasks.Get("/", taskHandler.List)
 	tasks.Get("/:id", taskHandler.GetByID)

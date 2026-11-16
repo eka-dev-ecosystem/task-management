@@ -36,7 +36,7 @@ func (r *repository) Create(ctx context.Context, tx *sqlx.Tx, userID string, req
 	query := `
 		INSERT INTO projects (user_id, name, color, description, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, NOW(), NOW())
-		RETURNING id, user_id, name, color, description, 0 as task_count, created_at, updated_at
+		RETURNING id, user_id, name, color, description, 0 as task_count, 0 as todo_task_count, 0 as in_progress_task_count, 0 as review_task_count, 0 as backlog_task_count, 0 as completed_task_count, created_at, updated_at
 	`
 	var res ProjectResponse
 	err := tx.QueryRowxContext(ctx, query, userID, req.Name, color, req.Description).StructScan(&res)
@@ -53,7 +53,12 @@ func (r *repository) FindAll(ctx context.Context, tx *sqlx.Tx, userID string) ([
 	query := `
 		SELECT 
 			p.id, p.user_id, p.name, p.color, p.description, p.created_at, p.updated_at,
-			COUNT(t.id) as task_count
+			COUNT(t.id) as task_count,
+			COUNT(CASE WHEN t.status = 'todo' THEN 1 END) as todo_task_count,
+			COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_task_count,
+			COUNT(CASE WHEN t.status = 'review' THEN 1 END) as review_task_count,
+			COUNT(CASE WHEN t.status = 'backlog' THEN 1 END) as backlog_task_count,
+			COUNT(CASE WHEN t.status = 'done' THEN 1 END) as completed_task_count
 		FROM projects p
 		LEFT JOIN tasks t ON t.project_id = p.id AND t.user_id = p.user_id
 		WHERE p.user_id = $1
@@ -78,7 +83,12 @@ func (r *repository) FindByID(ctx context.Context, tx *sqlx.Tx, userID string, i
 	query := `
 		SELECT 
 			p.id, p.user_id, p.name, p.color, p.description, p.created_at, p.updated_at,
-			COUNT(t.id) as task_count
+			COUNT(t.id) as task_count,
+			COUNT(CASE WHEN t.status = 'todo' THEN 1 END) as todo_task_count,
+			COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_task_count,
+			COUNT(CASE WHEN t.status = 'review' THEN 1 END) as review_task_count,
+			COUNT(CASE WHEN t.status = 'backlog' THEN 1 END) as backlog_task_count,
+			COUNT(CASE WHEN t.status = 'done' THEN 1 END) as completed_task_count
 		FROM projects p
 		LEFT JOIN tasks t ON t.project_id = p.id AND t.user_id = p.user_id
 		WHERE p.id = $1 AND p.user_id = $2
@@ -115,7 +125,7 @@ func (r *repository) Update(ctx context.Context, tx *sqlx.Tx, userID string, id 
 		args = append(args, *req.Description)
 	}
 
-	query += " WHERE id = $1 AND user_id = $2 RETURNING id, user_id, name, color, description, 0 as task_count, created_at, updated_at"
+	query += " WHERE id = $1 AND user_id = $2 RETURNING id, user_id, name, color, description, 0 as task_count, 0 as todo_task_count, 0 as in_progress_task_count, 0 as review_task_count, 0 as backlog_task_count, 0 as completed_task_count, created_at, updated_at"
 
 	var res ProjectResponse
 	err := tx.QueryRowxContext(ctx, query, args...).StructScan(&res)

@@ -64,7 +64,7 @@ export const TaskListView: React.FC = () => {
     const raw = data?.pages.flatMap((page) => (Array.isArray(page?.items) ? page.items : [])) || []
     const uniqueMap = new Map<number, (typeof raw)[number]>()
     for (const item of raw) {
-      if (item && item.id != null && !uniqueMap.has(item.id)) {
+      if (item && item.id !== null && item.id !== undefined && !uniqueMap.has(item.id)) {
         uniqueMap.set(item.id, item)
       }
     }

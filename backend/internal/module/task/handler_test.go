@@ -34,6 +34,7 @@ func setupTaskTestApp(repo Repository, userID string) *fiber.App {
 	})
 
 	group := app.Group("/api/v1/tasks")
+	group.Get("/metrics", handler.GetMetrics)
 	group.Post("/", handler.Create)
 	group.Get("/", handler.List)
 	group.Get("/:id", handler.GetByID)
@@ -535,5 +536,49 @@ func TestTaskHandler_Activities(t *testing.T) {
 	postResp := doJSONTaskRequest(t, app, http.MethodPost, fmt.Sprintf("/api/v1/tasks/%d/activities", taskID), postBody)
 	if postResp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected POST status 201, got %d", postResp.StatusCode)
+	}
+}
+
+func TestTaskAPI_GetMetrics(t *testing.T) {
+	const testUser = "user-task-metrics"
+	var capturedProjectID *int64
+
+	repo := &mockRepository{
+		getTaskMetricsFunc: func(ctx context.Context, userID string, projectID *int64) (*TaskStatusMetricsResponse, error) {
+			capturedProjectID = projectID
+			return &TaskStatusMetricsResponse{
+				Total:      30,
+				Todo:       10,
+				InProgress: 8,
+				Review:     4,
+				Backlog:    2,
+				Done:       6,
+			}, nil
+		},
+	}
+
+	app := setupTaskTestApp(repo, testUser)
+
+	// 1. Global metrics (no project_id)
+	resp := doJSONTaskRequest(t, app, http.MethodGet, "/api/v1/tasks/metrics", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200 OK, got %d", resp.StatusCode)
+	}
+	res := parseJSONTaskResponse(t, resp)
+	data := res["data"].(map[string]interface{})
+	if data["total"] != float64(30) || data["todo"] != float64(10) || data["in_progress"] != float64(8) {
+		t.Fatalf("unexpected metrics data: %v", data)
+	}
+	if capturedProjectID != nil {
+		t.Fatalf("expected nil projectID, got %v", capturedProjectID)
+	}
+
+	// 2. Project-scoped metrics (project_id=42)
+	resp2 := doJSONTaskRequest(t, app, http.MethodGet, "/api/v1/tasks/metrics?project_id=42", nil)
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200 OK, got %d", resp2.StatusCode)
+	}
+	if capturedProjectID == nil || *capturedProjectID != 42 {
+		t.Fatalf("expected projectID 42, got %v", capturedProjectID)
 	}
 }

@@ -530,6 +530,16 @@ type WidgetBundleResponse struct {
 	TotalToday        int            `json:"total_today"`
 }
 
+// TaskStatusMetricsResponse provides aggregated status counts for tasks.
+type TaskStatusMetricsResponse struct {
+	Total      int `json:"total" db:"total"`
+	Todo       int `json:"todo" db:"todo"`
+	InProgress int `json:"in_progress" db:"in_progress"`
+	Review     int `json:"review" db:"review"`
+	Backlog    int `json:"backlog" db:"backlog"`
+	Done       int `json:"done" db:"done"`
+}
+
 // WorkspaceStatsResponse provides lightweight counts for the navigation sidebar and dashboard badges.
 type WorkspaceStatsResponse struct {
 	TasksInProgress  int `json:"tasks_in_progress" db:"tasks_in_progress"`

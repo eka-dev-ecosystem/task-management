@@ -3,34 +3,34 @@ import React, { useMemo, useState } from 'react'
 import { ProjectsSkeleton } from '@/components'
 import { ProjectAccordionItem, ProjectModal } from '@/features/projects'
 import { TaskDetailModal, TaskModal } from '@/features/tasks'
-import { useProjects, useTasks, useUrlQueryState } from '@/hooks'
+import { useProjects, useUrlQueryState } from '@/hooks'
 import { useTranslation } from '@/i18n'
 import type { Project } from '@/types'
 
 export const ProjectsPage: React.FC = () => {
   const { t } = useTranslation()
   const { data: rawProjects = [], isLoading } = useProjects()
-  const { data: rawTasks = [] } = useTasks()
   const projects = useMemo(() => (Array.isArray(rawProjects) ? rawProjects : []), [rawProjects])
-  const allTasks = useMemo(() => (Array.isArray(rawTasks) ? rawTasks : []), [rawTasks])
 
-  // Project Task Metrics
-  const projectTasks = useMemo(
-    () => allTasks.filter((t) => t && typeof t.project_id === 'number' && t.project_id > 0),
-    [allTasks]
+  // Project Task Metrics calculated directly from project aggregates (Zero task queries!)
+  const totalProjectTasks = useMemo(
+    () => projects.reduce((acc, p) => acc + (p.task_count || 0), 0),
+    [projects]
   )
   const inProgressProjectTasks = useMemo(
-    () => projectTasks.filter((t) => t.status === 'in_progress').length,
-    [projectTasks]
+    () => projects.reduce((acc, p) => acc + (p.in_progress_task_count || 0), 0),
+    [projects]
   )
   const completedProjectTasks = useMemo(
-    () => projectTasks.filter((t) => t.status === 'done').length,
-    [projectTasks]
+    () => projects.reduce((acc, p) => acc + (p.completed_task_count || 0), 0),
+    [projects]
   )
   const completionRate = useMemo(
     () =>
-      projectTasks.length > 0 ? Math.round((completedProjectTasks / projectTasks.length) * 100) : 0,
-    [projectTasks.length, completedProjectTasks]
+      totalProjectTasks > 0
+        ? Math.round((completedProjectTasks / totalProjectTasks) * 100)
+        : 0,
+    [totalProjectTasks, completedProjectTasks]
   )
 
   const [search, setSearch] = useUrlQueryState('search', '', { debounceMs: 300 })
@@ -122,7 +122,7 @@ export const ProjectsPage: React.FC = () => {
             <i className="pi pi-check-square text-indigo-500 dark:text-indigo-400 text-xs" />
           </div>
           <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            {projectTasks.length}
+            {totalProjectTasks}
           </p>
           <span className="text-[10px] text-slate-500">{t('dashboard.activeTasks')}</span>
         </div>

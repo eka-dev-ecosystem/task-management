@@ -66,17 +66,24 @@ public final class ProjectViewModel {
         tasks.filter { ($0.projectId ?? 0) > 0 }
     }
 
+    public var totalProjectTasksCount: Int {
+        let fromProjects = projects.reduce(0) { $0 + ($1.taskCount ?? 0) }
+        return fromProjects > 0 ? fromProjects : projectTasks.count
+    }
+
     public var activeProjectTasksCount: Int {
-        projectTasks.filter { $0.status != "done" }.count
+        let fromProjects = projects.reduce(0) { $0 + max(0, ($1.taskCount ?? 0) - ($1.completedTaskCount ?? 0)) }
+        return fromProjects > 0 ? fromProjects : projectTasks.filter { $0.status != "done" }.count
     }
 
     public var completedProjectTasksCount: Int {
-        projectTasks.filter { $0.status == "done" }.count
+        let fromProjects = projects.reduce(0) { $0 + ($1.completedTaskCount ?? 0) }
+        return fromProjects > 0 ? fromProjects : projectTasks.filter { $0.status == "done" }.count
     }
 
     public var completionRatePercent: Int {
-        guard !projectTasks.isEmpty else { return 0 }
-        return Int(round(Double(completedProjectTasksCount) / Double(projectTasks.count) * 100))
+        guard totalProjectTasksCount > 0 else { return 0 }
+        return Int(round(Double(completedProjectTasksCount) / Double(totalProjectTasksCount) * 100))
     }
 
     public func tasks(for projectId: Int64) -> [TaskItem] {
@@ -508,11 +515,11 @@ private struct ProjectAccordionCard: View {
     }
 
     private var totalTasks: Int {
-        tasks.count
+        project.taskCount ?? tasks.count
     }
 
     private var completedTasks: Int {
-        tasks.filter { $0.status == "done" }.count
+        project.completedTaskCount ?? tasks.filter { $0.status == "done" }.count
     }
 
     private var percentDone: Int {
@@ -626,21 +633,21 @@ private struct ProjectAccordionCard: View {
                             }
 
                             StatusFilterPill(
-                                title: "To Do (\(tasks.filter { $0.status == "todo" }.count))",
+                                title: "To Do (\(project.todoTaskCount ?? tasks.filter { $0.status == "todo" }.count))",
                                 isSelected: selectedStatusTab == "todo"
                             ) {
                                 selectedStatusTab = "todo"
                             }
 
                             StatusFilterPill(
-                                title: "In Progress (\(tasks.filter { $0.status == "in_progress" }.count))",
+                                title: "In Progress (\(project.inProgressTaskCount ?? tasks.filter { $0.status == "in_progress" }.count))",
                                 isSelected: selectedStatusTab == "in_progress"
                             ) {
                                 selectedStatusTab = "in_progress"
                             }
 
                             StatusFilterPill(
-                                title: "Review (\(tasks.filter { $0.status == "review" }.count))",
+                                title: "Review (\(project.reviewTaskCount ?? tasks.filter { $0.status == "review" }.count))",
                                 isSelected: selectedStatusTab == "review"
                             ) {
                                 selectedStatusTab = "review"

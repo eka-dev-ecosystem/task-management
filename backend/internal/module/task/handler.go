@@ -451,6 +451,29 @@ func (h *Handler) GetWorkspaceStats(c *fiber.Ctx) error {
 	return response.SuccessResponse(c, result, "Workspace stats retrieved successfully")
 }
 
+func (h *Handler) GetMetrics(c *fiber.Ctx) error {
+	userID, err := authMiddleware.GetUserID(c)
+	if err != nil {
+		return err
+	}
+
+	var projectIDPtr *int64
+	projectIDStr := c.Query("project_id")
+	if projectIDStr != "" {
+		pid, err := strconv.ParseInt(projectIDStr, 10, 64)
+		if err == nil && pid > 0 {
+			projectIDPtr = &pid
+		}
+	}
+
+	result, err := h.service.GetTaskMetrics(c.UserContext(), userID, projectIDPtr)
+	if err != nil {
+		return err
+	}
+
+	return response.SuccessResponse(c, result, "Task metrics retrieved successfully")
+}
+
 // --- Recurring Tasks HTTP Handlers ---
 
 func (h *Handler) ListRecurringTasks(c *fiber.Ctx) error {

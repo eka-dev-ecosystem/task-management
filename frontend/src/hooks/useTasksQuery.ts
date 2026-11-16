@@ -1,7 +1,7 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { taskApi } from '@/api'
+import { taskApi, type TaskStatusMetrics } from '@/api'
 import { useAppToast } from '@/components'
 import { useTranslation } from '@/i18n'
 import { useTaskStore } from '@/stores'
@@ -173,10 +173,14 @@ export const useTasks = (params?: TaskFilterParams, options?: { enabled?: boolea
   })
 }
 
-export const useInfiniteTasks = (params?: TaskFilterParams) => {
+export const useInfiniteTasks = (
+  params?: TaskFilterParams,
+  options?: { enabled?: boolean }
+) => {
   const cleaned = cleanParams(params)
   return useInfiniteQuery({
     queryKey: taskKeys.infinite(cleaned),
+    enabled: options?.enabled,
     initialPageParam: undefined as number | undefined,
     queryFn: async ({ pageParam }): Promise<TaskCursorResponse> => {
       const queryParams: TaskFilterParams = {
@@ -207,6 +211,16 @@ export const useInfiniteTasks = (params?: TaskFilterParams) => {
       lastPage.has_more ? (lastPage.next_cursor ?? undefined) : undefined
   })
 }
+
+export const useTaskMetrics = (projectId?: number, options?: { enabled?: boolean }) =>
+  useQuery({
+    queryKey: ['tasks', 'metrics', projectId ?? 'all'],
+    enabled: options?.enabled,
+    queryFn: async (): Promise<TaskStatusMetrics> => {
+      const res = await taskApi.getMetrics(projectId)
+      return res.data
+    }
+  })
 
 export const useTask = (id?: number) =>
   useQuery({

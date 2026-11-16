@@ -271,37 +271,38 @@ public struct TaskListView: View {
 
                 // Filter Segment Pills for Status (Semua, To Do, In Progress, Review, Selesai)
                 ScrollView(.horizontal, showsIndicators: false) {
+                    let metrics = viewModel.statusMetrics
                     HStack(spacing: 8) {
                         FilterButton(
-                            title: "\(L10n.Tasks.filterAll) (\(viewModel.tasks.count))",
+                            title: "\(L10n.Tasks.filterAll) (\(metrics?.total ?? viewModel.tasks.count))",
                             icon: "tray.fill",
                             isSelected: viewModel.selectedStatus == nil
                         ) {
                             viewModel.setStatusFilter(nil)
                         }
                         FilterButton(
-                            title: "\(L10n.Tasks.statusTodo) (\(viewModel.tasks.filter { $0.status == "todo" }.count))",
+                            title: "\(L10n.Tasks.statusTodo) (\(metrics?.todo ?? viewModel.tasks.filter { $0.status == "todo" }.count))",
                             icon: "circle",
                             isSelected: viewModel.selectedStatus == "todo"
                         ) {
                             viewModel.setStatusFilter("todo")
                         }
                         FilterButton(
-                            title: "\(L10n.Tasks.statusInProgress) (\(viewModel.tasks.filter { $0.status == "in_progress" }.count))",
+                            title: "\(L10n.Tasks.statusInProgress) (\(metrics?.inProgress ?? viewModel.tasks.filter { $0.status == "in_progress" }.count))",
                             icon: "arrow.triangle.2.circlepath",
                             isSelected: viewModel.selectedStatus == "in_progress"
                         ) {
                             viewModel.setStatusFilter("in_progress")
                         }
                         FilterButton(
-                            title: "\(L10n.Tasks.statusReview) (\(viewModel.tasks.filter { $0.status == "review" }.count))",
+                            title: "\(L10n.Tasks.statusReview) (\(metrics?.review ?? viewModel.tasks.filter { $0.status == "review" }.count))",
                             icon: "eye.fill",
                             isSelected: viewModel.selectedStatus == "review"
                         ) {
                             viewModel.setStatusFilter("review")
                         }
                         FilterButton(
-                            title: "\(L10n.Tasks.statusDone) (\(viewModel.tasks.filter { $0.status == "done" }.count))",
+                            title: "\(L10n.Tasks.statusDone) (\(metrics?.done ?? viewModel.tasks.filter { $0.status == "done" }.count))",
                             icon: "checkmark.circle.fill",
                             isSelected: viewModel.selectedStatus == "done"
                         ) {

@@ -47,6 +47,7 @@ type mockRepository struct {
 
 	getWidgetBundleFunc             func(ctx context.Context, userID string) (*WidgetBundleResponse, error)
 	getWorkspaceStatsFunc           func(ctx context.Context, userID string) (*WorkspaceStatsResponse, error)
+	getTaskMetricsFunc              func(ctx context.Context, userID string, projectID *int64) (*TaskStatusMetricsResponse, error)
 	updateRecurrenceGeneratedAtFunc func(ctx context.Context, id int64, t time.Time) error
 
 	createActivityFunc       func(ctx context.Context, taskID int64, userID string, activityType string, description string, changes []byte) (*TaskActivityResponse, error)
@@ -139,6 +140,13 @@ func (m *mockRepository) GetWorkspaceStats(ctx context.Context, tx *sqlx.Tx, use
 		return m.getWorkspaceStatsFunc(ctx, userID)
 	}
 	return &WorkspaceStatsResponse{}, nil
+}
+
+func (m *mockRepository) GetTaskMetrics(ctx context.Context, tx *sqlx.Tx, userID string, projectID *int64) (*TaskStatusMetricsResponse, error) {
+	if m.getTaskMetricsFunc != nil {
+		return m.getTaskMetricsFunc(ctx, userID, projectID)
+	}
+	return &TaskStatusMetricsResponse{}, nil
 }
 
 func (m *mockRepository) UpdateRecurrenceGeneratedAt(ctx context.Context, tx *sqlx.Tx, id int64, t time.Time) error {

@@ -571,6 +571,14 @@ public actor APIClient {
         return try await request(endpoint: endpoint)
     }
 
+    public func getTaskMetrics(projectId: Int64? = nil) async throws -> TaskStatusMetrics {
+        var endpoint = "tasks/metrics"
+        if let pid = projectId {
+            endpoint += "?project_id=\(pid)"
+        }
+        return try await request(endpoint: endpoint)
+    }
+
     public func getTask(id: Int64) async throws -> TaskItem {
         return try await request(endpoint: "tasks/\(id)")
     }

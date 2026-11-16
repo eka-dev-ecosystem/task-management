@@ -53,6 +53,7 @@ type Service interface {
 	// Widget & Recurrence methods
 	GetWidgetBundle(ctx context.Context, userID string) (*WidgetBundleResponse, error)
 	GetWorkspaceStats(ctx context.Context, userID string) (*WorkspaceStatsResponse, error)
+	GetTaskMetrics(ctx context.Context, userID string, projectID *int64) (*TaskStatusMetricsResponse, error)
 	ProcessTaskRecurrence(ctx context.Context, taskID int64) error
 	ReconcileActiveRecurringTasks(ctx context.Context) error
 
@@ -1074,6 +1075,17 @@ func (s *service) GetWorkspaceStats(ctx context.Context, userID string) (*Worksp
 		return err
 	})
 	return stats, err
+}
+
+func (s *service) GetTaskMetrics(ctx context.Context, userID string, projectID *int64) (*TaskStatusMetricsResponse, error) {
+	var metrics *TaskStatusMetricsResponse
+	err := s.db.WithReadOnlyTransactionCtx(ctx, func(tx *sqlx.Tx) error {
+		ctx := database.ContextWithTx(ctx, tx)
+		var err error
+		metrics, err = s.repo.GetTaskMetrics(ctx, tx, userID, projectID)
+		return err
+	})
+	return metrics, err
 }
 
 func (s *service) ProcessTaskRecurrence(ctx context.Context, targetID int64) error {

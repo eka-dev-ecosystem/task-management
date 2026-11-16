@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import { confirmDialog, TaskListSkeleton } from '@/components'
-import { useDeleteProject, useTasks, useToggleFocus, useUpdateTask } from '@/hooks'
+import { useDeleteProject, useInfiniteTasks, useToggleFocus, useUpdateTask } from '@/hooks'
 import { useTranslation } from '@/i18n'
 import { useTaskStore, useUIStore } from '@/stores'
 import {
@@ -43,14 +43,52 @@ export const ProjectAccordionItem: React.FC<ProjectAccordionItemProps> = ({
   const updateTaskMutation = useUpdateTask()
   const toggleFocusMutation = useToggleFocus()
 
-  // Fetch tasks belonging specifically to this project (enabled only when expanded or to calculate live stats)
-  const { data: rawTasks, isLoading: isLoadingTasks } = useTasks({
-    project_id: project.id
-  })
-  const tasks = useMemo(
-    () => (Array.isArray(rawTasks) ? rawTasks.filter((t) => t && t.project_id === project.id) : []),
-    [rawTasks, project.id]
+  const [activeStatusTab, setActiveStatusTab] = useState<TaskStatus | 'all'>('all')
+
+  // Fetch tasks belonging specifically to this project (LAZY: enabled only when expanded)
+  const {
+    data,
+    isLoading: isLoadingTasks,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage
+  } = useInfiniteTasks(
+    {
+      project_id: project.id,
+      status: activeStatusTab === 'all' ? undefined : activeStatusTab
+    },
+    { enabled: isExpanded }
   )
+
+  const tasks = useMemo(() => {
+    const raw = data?.pages.flatMap((page) => (Array.isArray(page?.items) ? page.items : [])) || []
+    const uniqueMap = new Map<number, (typeof raw)[number]>()
+    for (const item of raw) {
+      if (item && item.id !== null && item.id !== undefined && !uniqueMap.has(item.id)) {
+        uniqueMap.set(item.id, item)
+      }
+    }
+    return Array.from(uniqueMap.values()).sort(compareTasks)
+  }, [data])
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !isExpanded) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [isExpanded, hasNextPage, isFetchingNextPage, fetchNextPage])
 
   // Filter tasks by status and sort
   const tasksByStatus = useMemo(() => {
@@ -72,11 +110,27 @@ export const ProjectAccordionItem: React.FC<ProjectAccordionItemProps> = ({
     return map
   }, [tasks])
 
-  const totalTasks = tasks.length
-  const completedTasks = tasksByStatus.done.length
+  const totalTasks = project.task_count ?? tasks.length
+  const completedTasks =
+    project.completed_task_count ?? tasks.filter((t) => t.status === 'done').length
   const percentDone = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 
-  const [activeStatusTab, setActiveStatusTab] = useState<TaskStatus | 'all'>('all')
+  const getStatusCount = (s: TaskStatus): number => {
+    switch (s) {
+      case 'todo':
+        return project.todo_task_count ?? tasksByStatus.todo.length
+      case 'in_progress':
+        return project.in_progress_task_count ?? tasksByStatus.in_progress.length
+      case 'review':
+        return project.review_task_count ?? tasksByStatus.review.length
+      case 'backlog':
+        return project.backlog_task_count ?? tasksByStatus.backlog.length
+      case 'done':
+        return project.completed_task_count ?? tasksByStatus.done.length
+      default:
+        return 0
+    }
+  }
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -132,7 +186,7 @@ export const ProjectAccordionItem: React.FC<ProjectAccordionItemProps> = ({
             {totalTasks > 0 && (
               <div className="w-full max-w-md h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 mt-2.5 overflow-hidden flex">
                 {STATUS_KEYS.map((s) => {
-                  const count = tasksByStatus[s].length
+                  const count = getStatusCount(s)
                   if (count === 0) return null
                   const widthPct = (count / totalTasks) * 100
                   return (
@@ -225,7 +279,7 @@ export const ProjectAccordionItem: React.FC<ProjectAccordionItemProps> = ({
                   }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${STATUS_COLORS[s].dot}`} />
-                  {t(`tasks.status.${s}`)} ({tasksByStatus[s].length})
+                  {t(`tasks.status.${s}`)} ({getStatusCount(s)})
                 </button>
               ))}
             </div>
@@ -245,7 +299,7 @@ export const ProjectAccordionItem: React.FC<ProjectAccordionItemProps> = ({
             <div className="py-2">
               <TaskListSkeleton count={2} />
             </div>
-          ) : totalTasks === 0 ? (
+          ) : totalTasks === 0 || (!isLoadingTasks && tasks.length === 0) ? (
             <div className="py-10 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
               <i className="pi pi-folder-open text-3xl text-slate-300 dark:text-slate-600 mb-2" />
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -393,6 +447,30 @@ export const ProjectAccordionItem: React.FC<ProjectAccordionItemProps> = ({
                   )
                 }
               )}
+
+              {/* Infinite Scroll Sentinel & Loader */}
+              <div
+                ref={sentinelRef}
+                className="py-2.5 flex items-center justify-center bg-transparent"
+              >
+                {isFetchingNextPage ? (
+                  <div className="w-full py-2">
+                    <TaskListSkeleton count={2} />
+                  </div>
+                ) : hasNextPage ? (
+                  <button
+                    type="button"
+                    onClick={() => fetchNextPage()}
+                    className="text-xs text-slate-400 hover:text-indigo-500 py-1 transition-colors font-mono cursor-pointer"
+                  >
+                    {t('tasks.loadingMore')}
+                  </button>
+                ) : tasks.length > 10 ? (
+                  <span className="text-[11px] text-slate-400 dark:text-slate-600 py-1 font-mono">
+                    {t('tasks.allTasksLoaded')}
+                  </span>
+                ) : null}
+              </div>
             </div>
           )}
         </div>

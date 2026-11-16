@@ -64,7 +64,7 @@ export const useUpdateRecurringTask = () => {
       const res = await recurringTaskApi.update(id, payload)
       return res.data
     },
-    onSuccess: (_, vars) => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: recurringTaskKeys.all })
       queryClient.invalidateQueries({ queryKey: recurringTaskKeys.detail(vars.id) })
       queryClient.invalidateQueries({ queryKey: taskKeys.all })

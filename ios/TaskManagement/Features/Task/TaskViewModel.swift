@@ -13,6 +13,7 @@ public final class TaskViewModel {
     public var filterFocusOnly: Bool = false
     public var searchQuery: String = ""
     public var projects: [Project] = []
+    public var statusMetrics: TaskStatusMetrics? = nil
     public var taskActivities: [TaskActivity] = []
     public var isLoadingActivities = false
     public var selectedTaskForDetail: TaskItem? = nil
@@ -57,8 +58,20 @@ public final class TaskViewModel {
     public init() {
         Task {
             await loadTasks()
+            await loadTaskMetrics()
             await loadProjects()
             await loadRecurringTasks()
+        }
+    }
+
+    @MainActor
+    public func loadTaskMetrics() async {
+        do {
+            self.statusMetrics = try await apiClient.getTaskMetrics(projectId: selectedProjectId)
+        } catch {
+            if !error.isTaskOrURLCancelled {
+                AppLogger.warn("Failed to load task metrics", error: error, category: .task)
+            }
         }
     }
 
@@ -104,6 +117,9 @@ public final class TaskViewModel {
         }
         if reset {
             self.isLoading = false
+            Task {
+                await loadTaskMetrics()
+            }
         }
     }
 

@@ -809,6 +809,37 @@ public struct CreateTaskActivityRequest: Codable {
     }
 }
 
+// MARK: - Task Status Metrics
+public struct TaskStatusMetrics: Codable, Equatable, Sendable {
+    public let total: Int
+    public let todo: Int
+    public let inProgress: Int
+    public let review: Int
+    public let backlog: Int
+    public let done: Int
+
+    public init(
+        total: Int = 0,
+        todo: Int = 0,
+        inProgress: Int = 0,
+        review: Int = 0,
+        backlog: Int = 0,
+        done: Int = 0
+    ) {
+        self.total = total
+        self.todo = todo
+        self.inProgress = inProgress
+        self.review = review
+        self.backlog = backlog
+        self.done = done
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case total, todo, review, backlog, done
+        case inProgress = "in_progress"
+    }
+}
+
 // MARK: - Project
 public struct Project: Codable, Identifiable, Sendable, Equatable {
     public let id: Int64
@@ -816,10 +847,44 @@ public struct Project: Codable, Identifiable, Sendable, Equatable {
     public let color: String
     public let description: String
     public let taskCount: Int?
+    public let todoTaskCount: Int?
+    public let inProgressTaskCount: Int?
+    public let reviewTaskCount: Int?
+    public let backlogTaskCount: Int?
+    public let completedTaskCount: Int?
+
+    public init(
+        id: Int64,
+        name: String,
+        color: String,
+        description: String,
+        taskCount: Int? = nil,
+        todoTaskCount: Int? = nil,
+        inProgressTaskCount: Int? = nil,
+        reviewTaskCount: Int? = nil,
+        backlogTaskCount: Int? = nil,
+        completedTaskCount: Int? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.color = color
+        self.description = description
+        self.taskCount = taskCount
+        self.todoTaskCount = todoTaskCount
+        self.inProgressTaskCount = inProgressTaskCount
+        self.reviewTaskCount = reviewTaskCount
+        self.backlogTaskCount = backlogTaskCount
+        self.completedTaskCount = completedTaskCount
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, name, color, description
         case taskCount = "task_count"
+        case todoTaskCount = "todo_task_count"
+        case inProgressTaskCount = "in_progress_task_count"
+        case reviewTaskCount = "review_task_count"
+        case backlogTaskCount = "backlog_task_count"
+        case completedTaskCount = "completed_task_count"
     }
 }
 

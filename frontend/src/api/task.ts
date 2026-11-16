@@ -57,5 +57,19 @@ export const taskApi = {
     apiClient.get<TaskActivity[]>(`/api/v1/tasks/${taskId}/activities`),
 
   createActivity: (taskId: number, payload: CreateTaskActivityPayload) =>
-    apiClient.post<TaskActivity>(`/api/v1/tasks/${taskId}/activities`, payload)
+    apiClient.post<TaskActivity>(`/api/v1/tasks/${taskId}/activities`, payload),
+
+  getMetrics: (projectId?: number) =>
+    apiClient.get<TaskStatusMetrics>('/api/v1/tasks/metrics', {
+      params: projectId ? { project_id: projectId } : undefined
+    })
+}
+
+export interface TaskStatusMetrics {
+  total: number
+  todo: number
+  in_progress: number
+  review: number
+  backlog: number
+  done: number
 }
