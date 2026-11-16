@@ -158,12 +158,22 @@ fun ProjectScreen(viewModel: ProjectViewModel) {
         }
     }
 
-    // Metrics matching iOS
+    // Metrics matching iOS & Web
     val projectTasks = remember(tasks) { tasks.filter { (it.projectId ?: 0) > 0 } }
-    val activeCount = remember(projectTasks) { projectTasks.count { it.status != "done" } }
-    val completedCount = remember(projectTasks) { projectTasks.count { it.status == "done" } }
-    val completionRate = remember(projectTasks, completedCount) {
-        if (projectTasks.isNotEmpty()) (completedCount * 100) / projectTasks.size else 0
+    val totalProjectTasksCount = remember(projects, projectTasks) {
+        val fromProjects = projects.sumOf { it.taskCount }
+        if (fromProjects > 0) fromProjects else projectTasks.size
+    }
+    val activeCount = remember(projects, projectTasks) {
+        val fromProjects = projects.sumOf { maxOf(0, it.taskCount - it.completedTaskCount) }
+        if (fromProjects > 0) fromProjects else projectTasks.count { it.status != "done" }
+    }
+    val completedCount = remember(projects, projectTasks) {
+        val fromProjects = projects.sumOf { it.completedTaskCount }
+        if (fromProjects > 0) fromProjects else projectTasks.count { it.status == "done" }
+    }
+    val completionRate = remember(totalProjectTasksCount, completedCount) {
+        if (totalProjectTasksCount > 0) (completedCount * 100) / totalProjectTasksCount else 0
     }
 
     Scaffold(
@@ -306,8 +316,9 @@ fun ProjectScreen(viewModel: ProjectViewModel) {
                                         shape = CircleShape,
                                         color = projColor.copy(alpha = 0.12f)
                                     ) {
+                                        val displayCount = if (proj.taskCount > 0) proj.taskCount else projectTasksList.size
                                         Text(
-                                            stringResource(R.string.tasks_count_badge, projectTasksList.size),
+                                            stringResource(R.string.tasks_count_badge, displayCount),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = projColor,

@@ -270,6 +270,7 @@ fun TaskListScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val metrics = uiState.statusMetrics
                     FilterChip(
                         selected = uiState.selectedStatus == null && uiState.selectedProjectId == null,
                         onClick = {
@@ -277,31 +278,46 @@ fun TaskListScreen(
                             viewModel.setProjectFilter(null)
                         },
                         leadingIcon = { Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                        label = { Text(stringResource(R.string.filter_all)) }
+                        label = {
+                            val count = metrics?.total ?: uiState.tasks.size
+                            Text(if (metrics != null) "${stringResource(R.string.filter_all)} ($count)" else stringResource(R.string.filter_all))
+                        }
                     )
                     FilterChip(
                         selected = uiState.selectedStatus == "todo",
                         onClick = { viewModel.setStatusFilter(if (uiState.selectedStatus == "todo") null else "todo") },
                         leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                        label = { Text(stringResource(R.string.filter_todo)) }
+                        label = {
+                            val count = metrics?.todo ?: 0
+                            Text(if (metrics != null) "${stringResource(R.string.filter_todo)} ($count)" else stringResource(R.string.filter_todo))
+                        }
                     )
                     FilterChip(
                         selected = uiState.selectedStatus == "in_progress",
                         onClick = { viewModel.setStatusFilter(if (uiState.selectedStatus == "in_progress") null else "in_progress") },
                         leadingIcon = { Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                        label = { Text(stringResource(R.string.filter_in_progress)) }
+                        label = {
+                            val count = metrics?.inProgress ?: 0
+                            Text(if (metrics != null) "${stringResource(R.string.filter_in_progress)} ($count)" else stringResource(R.string.filter_in_progress))
+                        }
                     )
                     FilterChip(
                         selected = uiState.selectedStatus == "review",
                         onClick = { viewModel.setStatusFilter(if (uiState.selectedStatus == "review") null else "review") },
                         leadingIcon = { Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                        label = { Text(stringResource(R.string.filter_review)) }
+                        label = {
+                            val count = metrics?.review ?: 0
+                            Text(if (metrics != null) "${stringResource(R.string.filter_review)} ($count)" else stringResource(R.string.filter_review))
+                        }
                     )
                     FilterChip(
                         selected = uiState.selectedStatus == "done",
                         onClick = { viewModel.setStatusFilter(if (uiState.selectedStatus == "done") null else "done") },
                         leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                        label = { Text(stringResource(R.string.filter_done)) }
+                        label = {
+                            val count = metrics?.done ?: 0
+                            Text(if (metrics != null) "${stringResource(R.string.filter_done)} ($count)" else stringResource(R.string.filter_done))
+                        }
                     )
                     FilterChip(
                         selected = uiState.filterFocusOnly,

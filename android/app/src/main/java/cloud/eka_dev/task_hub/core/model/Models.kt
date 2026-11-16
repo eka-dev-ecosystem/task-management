@@ -232,12 +232,27 @@ data class CreateTaskActivityRequest(
 )
 
 @Serializable
+data class TaskStatusMetrics(
+    val total: Int = 0,
+    val todo: Int = 0,
+    @SerialName("in_progress") val inProgress: Int = 0,
+    val review: Int = 0,
+    val backlog: Int = 0,
+    val done: Int = 0
+)
+
+@Serializable
 data class Project(
     val id: Long,
     val name: String,
     val color: String = "#3B82F6",
     val description: String = "",
-    @SerialName("task_count") val taskCount: Int = 0
+    @SerialName("task_count") val taskCount: Int = 0,
+    @SerialName("todo_task_count") val todoTaskCount: Int = 0,
+    @SerialName("in_progress_task_count") val inProgressTaskCount: Int = 0,
+    @SerialName("review_task_count") val reviewTaskCount: Int = 0,
+    @SerialName("backlog_task_count") val backlogTaskCount: Int = 0,
+    @SerialName("completed_task_count") val completedTaskCount: Int = 0
 )
 
 @Serializable

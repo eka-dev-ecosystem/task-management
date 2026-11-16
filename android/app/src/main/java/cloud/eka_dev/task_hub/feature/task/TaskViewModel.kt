@@ -24,6 +24,7 @@ data class TaskUiState(
     val taskActivities: List<TaskActivity> = emptyList(),
     val isLoadingActivities: Boolean = false,
     val projects: List<Project> = emptyList(),
+    val statusMetrics: TaskStatusMetrics? = null,
     val selectedTab: Int = 0, // 0 = Tasks, 1 = Recurring Templates
     val recurringTasks: List<RecurringTaskItem> = emptyList(),
     val isLoadingRecurring: Boolean = false,
@@ -49,6 +50,7 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
         loadTasks(reset = true)
         loadProjects()
         loadRecurringTasks()
+        loadTaskMetrics()
     }
 
     fun setSelectedTab(tab: Int) {
@@ -75,7 +77,23 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
         }
     }
 
+    fun loadTaskMetrics() {
+        viewModelScope.launch {
+            try {
+                val res = apiClient.apiService.getTaskMetrics(projectId = _uiState.value.selectedProjectId)
+                if (res.success && res.data != null) {
+                    _uiState.value = _uiState.value.copy(statusMetrics = res.data)
+                }
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
     fun loadTasks(reset: Boolean = true) {
+        if (reset) {
+            loadTaskMetrics()
+        }
         viewModelScope.launch {
             if (reset) {
                 _uiState.value = _uiState.value.copy(
@@ -209,6 +227,7 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
                     }
                 }
                 loadTasks()
+                loadProjects()
             } catch (e: Exception) {
                 // handle error
             }
@@ -233,6 +252,7 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
                     }
                 }
                 loadTasks()
+                loadProjects()
             } catch (e: Exception) {
                 loadTasks()
             }
@@ -275,6 +295,7 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
                         _uiState.value = _uiState.value.copy(selectedTask = res.data)
                     }
                     loadTasks()
+                    loadProjects()
                     onSuccess?.invoke()
                 }
             } catch (e: Exception) {
@@ -294,6 +315,7 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
                 val res = apiClient.apiService.createTask(req)
                 if (res.success) {
                     loadTasks()
+                    loadProjects()
                     onSuccess?.invoke()
                 } else {
                     _uiState.value = _uiState.value.copy(error = res.message)
@@ -334,6 +356,7 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
                     )
                     onSuccess?.invoke()
                     loadTasks()
+                    loadProjects()
                 }
             } catch (e: Exception) {
                 // handle error

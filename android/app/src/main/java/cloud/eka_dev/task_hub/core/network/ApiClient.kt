@@ -60,6 +60,11 @@ interface ApiService {
         @Query("search") search: String? = null
     ): BaseResponse<TaskCursorResponse>
 
+    @GET("tasks/metrics")
+    suspend fun getTaskMetrics(
+        @Query("project_id") projectId: Long? = null
+    ): BaseResponse<TaskStatusMetrics>
+
     @POST("tasks")
     suspend fun createTask(@Body req: CreateTaskRequest): BaseResponse<Task>
 
