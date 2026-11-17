@@ -83,10 +83,23 @@ public struct MainTabView: View {
             if let id = Int64(path) {
                 targetTaskId = id
             } else if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                      let queryItems = components.queryItems,
-                      let idStr = queryItems.first(where: { $0.name == "id" })?.value,
-                      let id = Int64(idStr) {
-                targetTaskId = id
+                      let queryItems = components.queryItems {
+                if let idStr = queryItems.first(where: { $0.name == "id" || $0.name == "task_id" })?.value,
+                   let id = Int64(idStr) {
+                    targetTaskId = id
+                }
+                if let search = queryItems.first(where: { $0.name == "search" })?.value, !search.isEmpty {
+                    taskViewModel.searchQuery = search
+                }
+                if let status = queryItems.first(where: { $0.name == "status" })?.value, !status.isEmpty {
+                    taskViewModel.selectedStatus = status.lowercased() == "all" ? nil : status
+                }
+                if let priority = queryItems.first(where: { $0.name == "priority" })?.value, !priority.isEmpty {
+                    taskViewModel.selectedPriority = priority.lowercased() == "all" ? nil : priority
+                }
+                if let filter = queryItems.first(where: { $0.name == "filter" })?.value, filter == "focus" {
+                    taskViewModel.filterFocusOnly = true
+                }
             }
         }
 

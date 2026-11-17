@@ -524,6 +524,37 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
         }
     }
 
+    fun selectTaskById(taskId: Long) {
+        viewModelScope.launch {
+            val existing = _uiState.value.tasks.find { it.id == taskId }
+            if (existing != null) {
+                selectTask(existing)
+            } else {
+                try {
+                    val res = apiClient.apiService.getTaskById(taskId)
+                    if (res.success && res.data != null) {
+                        selectTask(res.data)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    fun applyFilters(
+        status: String? = null,
+        projectId: Long? = null,
+        search: String? = null,
+        focusOnly: Boolean? = null
+    ) {
+        var state = _uiState.value
+        if (status != null) state = state.copy(selectedStatus = if (status.isEmpty() || status.lowercase() == "all") null else status)
+        if (projectId != null) state = state.copy(selectedProjectId = projectId)
+        if (search != null) state = state.copy(searchQuery = search)
+        if (focusOnly != null) state = state.copy(filterFocusOnly = focusOnly)
+        _uiState.value = state
+        loadTasks(reset = true)
+    }
+
     fun loadActivities(taskId: Long) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoadingActivities = true)

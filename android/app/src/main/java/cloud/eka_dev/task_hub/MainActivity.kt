@@ -43,21 +43,24 @@ import cloud.eka_dev.task_hub.feature.task.TaskViewModel
 
 class MainActivity : ComponentActivity() {
     private var pendingHubLink by mutableStateOf<HubLinkSessionPayload?>(null)
+    private var taskViewModel: TaskViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleDeepLink(intent)
         val app = application as TaskApp
         LanguageManager.initialize(app.tokenManager)
 
         val authViewModel = AuthViewModel(app.apiClient, app.tokenManager)
-        val taskViewModel = TaskViewModel(app.apiClient)
+        val taskVm = TaskViewModel(app.apiClient)
+        taskViewModel = taskVm
         val projectViewModel = ProjectViewModel(app.apiClient)
         val calendarViewModel = CalendarViewModel(app.apiClient)
         val noteViewModel = NoteViewModel(app.apiClient)
         val reminderViewModel = ReminderViewModel(app.apiClient, app.sseClient)
         val profileViewModel = ProfileViewModel(app.apiClient, app.tokenManager)
         val mcpViewModel = McpViewModel(app.apiClient)
+
+        handleDeepLink(intent)
 
         setContent {
             val currentLanguage by LanguageManager.currentLanguage.collectAsState()
@@ -73,7 +76,7 @@ class MainActivity : ComponentActivity() {
                             AuthScreen(
                                 viewModel = authViewModel,
                                 onAuthSuccess = {
-                                    taskViewModel.loadTasks()
+                                    taskVm.loadTasks()
                                     projectViewModel.loadData()
                                     calendarViewModel.loadMonthData(calendarViewModel.currentMonth.value)
                                     noteViewModel.loadNotes()
@@ -83,7 +86,7 @@ class MainActivity : ComponentActivity() {
                             )
                         } else {
                             MainNavigationScaffold(
-                                taskViewModel = taskViewModel,
+                                taskViewModel = taskVm,
                                 projectViewModel = projectViewModel,
                                 calendarViewModel = calendarViewModel,
                                 noteViewModel = noteViewModel,
@@ -128,14 +131,45 @@ class MainActivity : ComponentActivity() {
 
     private fun handleDeepLink(intent: Intent?) {
         val uri = intent?.data ?: return
-        if (uri.scheme == "taskhub" && (uri.host == "connect-hub" || uri.path?.contains("connect-hub") == true)) {
-            val sessionCode = uri.getQueryParameter("session_code")
-            val callbackUrl = uri.getQueryParameter("callback_url") ?: "ekahub://link-callback"
-            if (!sessionCode.isNullOrEmpty()) {
-                pendingHubLink = HubLinkSessionPayload(
-                    sessionCode = sessionCode,
-                    callbackUrl = callbackUrl
-                )
+        if (uri.scheme == "taskhub") {
+            val host = uri.host ?: ""
+            val path = uri.path ?: ""
+            if (host == "connect-hub" || path.contains("connect-hub")) {
+                val sessionCode = uri.getQueryParameter("session_code")
+                val callbackUrl = uri.getQueryParameter("callback_url") ?: "ekahub://link-callback"
+                if (!sessionCode.isNullOrEmpty()) {
+                    pendingHubLink = HubLinkSessionPayload(
+                        sessionCode = sessionCode,
+                        callbackUrl = callbackUrl
+                    )
+                }
+            } else if (host == "tasks" || host == "task" || path.contains("tasks")) {
+                val taskIdStr = uri.getQueryParameter("id")
+                    ?: uri.getQueryParameter("task_id")
+                    ?: uri.lastPathSegment?.takeIf { it != "tasks" && it != "task" }
+                val status = uri.getQueryParameter("status")
+                val projectIdStr = uri.getQueryParameter("project_id")
+                val search = uri.getQueryParameter("search")
+                val filter = uri.getQueryParameter("filter")
+
+                val vm = taskViewModel
+                if (vm != null) {
+                    val projectId = projectIdStr?.toLongOrNull()
+                    val focusOnly = if (filter == "focus") true else null
+                    if (status != null || projectId != null || search != null || focusOnly != null) {
+                        vm.applyFilters(
+                            status = status,
+                            projectId = projectId,
+                            search = search,
+                            focusOnly = focusOnly
+                        )
+                    }
+
+                    val taskId = taskIdStr?.toLongOrNull()
+                    if (taskId != null) {
+                        vm.selectTaskById(taskId)
+                    }
+                }
             }
         }
     }
