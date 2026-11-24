@@ -301,14 +301,15 @@ public struct TaskDetailSheet: View {
                                     onToggleCancel: {
                                         viewModel.toggleSubtaskCancelled(taskId: currentTask.id, subtaskId: subtask.id, currentCancelled: subtask.isCancelled)
                                     },
-                                    onUpdate: { title, description, dueDate, clearDueDate in
+                                    onUpdate: { title, description, dueDate, clearDueDate, isSkippable in
                                         await viewModel.updateSubtask(
                                             taskId: currentTask.id,
                                             subtaskId: subtask.id,
                                             title: title,
                                             description: description,
                                             dueDate: dueDate,
-                                            clearDueDate: clearDueDate
+                                            clearDueDate: clearDueDate,
+                                            isSkippable: isSkippable
                                         )
                                     },
                                     onDelete: {
@@ -779,14 +780,15 @@ public struct EditTaskSheet: View {
                                 onToggleCancel: {
                                     viewModel.toggleSubtaskCancelled(taskId: task.id, subtaskId: subtask.id, currentCancelled: subtask.isCancelled)
                                 },
-                                onUpdate: { title, description, dueDate, clearDueDate in
+                                onUpdate: { title, description, dueDate, clearDueDate, isSkippable in
                                     await viewModel.updateSubtask(
                                         taskId: task.id,
                                         subtaskId: subtask.id,
                                         title: title,
                                         description: description,
                                         dueDate: dueDate,
-                                        clearDueDate: clearDueDate
+                                        clearDueDate: clearDueDate,
+                                        isSkippable: isSkippable
                                     )
                                 },
                                 onDelete: {
@@ -950,7 +952,7 @@ public struct SubtaskItemRowView: View {
     var isRecurring: Bool = false
     let onToggle: (Bool) -> Void
     let onToggleCancel: () -> Void
-    let onUpdate: (String, String?, String?, Bool) async -> Bool
+    let onUpdate: (String, String?, String?, Bool, Bool) async -> Bool
     let onDelete: () async -> Void
 
     @State private var isExpanded: Bool = false
@@ -958,6 +960,7 @@ public struct SubtaskItemRowView: View {
     @State private var editDescription: String
     @State private var hasDueDate: Bool
     @State private var editDueDate: Date
+    @State private var editIsSkippable: Bool
     @State private var isSaving: Bool = false
     @State private var showDeleteConfirm: Bool = false
     @State private var validationError: String? = nil
@@ -968,7 +971,7 @@ public struct SubtaskItemRowView: View {
         isRecurring: Bool = false,
         onToggle: @escaping (Bool) -> Void,
         onToggleCancel: @escaping () -> Void,
-        onUpdate: @escaping (String, String?, String?, Bool) async -> Bool,
+        onUpdate: @escaping (String, String?, String?, Bool, Bool) async -> Bool,
         onDelete: @escaping () async -> Void
     ) {
         self.subtask = subtask
@@ -981,6 +984,7 @@ public struct SubtaskItemRowView: View {
 
         _editTitle = State(initialValue: subtask.title)
         _editDescription = State(initialValue: subtask.description ?? "")
+        _editIsSkippable = State(initialValue: subtask.isSkippable)
 
         if let dueStr = subtask.dueDate, let parsed = DateTimeHelper.parseISO8601(dueStr) {
             _hasDueDate = State(initialValue: true)
@@ -1031,7 +1035,7 @@ public struct SubtaskItemRowView: View {
         validationError = nil
 
         Task {
-            let success = await onUpdate(trimmedTitle, descParam, dueParam, clearDue)
+            let success = await onUpdate(trimmedTitle, descParam, dueParam, clearDue, editIsSkippable)
             await MainActor.run {
                 isSaving = false
                 if success {
@@ -1046,6 +1050,7 @@ public struct SubtaskItemRowView: View {
     private func handleCancel() {
         editTitle = subtask.title
         editDescription = subtask.description ?? ""
+        editIsSkippable = subtask.isSkippable
         if let dueStr = subtask.dueDate, let parsed = DateTimeHelper.parseISO8601(dueStr) {
             hasDueDate = true
             editDueDate = parsed
@@ -1140,13 +1145,15 @@ public struct SubtaskItemRowView: View {
             .buttonStyle(.plain)
 
             Menu {
-                Button {
-                    onToggleCancel()
-                } label: {
-                    Label(
-                        subtask.isCancelled ? L10n.Tasks.unskipSubtask : L10n.Tasks.skipSubtask,
-                        systemImage: subtask.isCancelled ? "arrow.uturn.backward" : "slash.circle"
-                    )
+                if subtask.isCancelled || subtask.isSkippable {
+                    Button {
+                        onToggleCancel()
+                    } label: {
+                        Label(
+                            subtask.isCancelled ? L10n.Tasks.unskipSubtask : L10n.Tasks.skipSubtask,
+                            systemImage: subtask.isCancelled ? "arrow.uturn.backward" : "slash.circle"
+                        )
+                    }
                 }
 
                 Button(role: .destructive) {
@@ -1169,8 +1176,22 @@ public struct SubtaskItemRowView: View {
     private var badgesRow: some View {
         let hasDesc = (subtask.description != nil && !subtask.description!.isEmpty)
         let hasDue = !isRecurring && (subtask.dueDate != nil && !subtask.dueDate!.isEmpty)
-        if subtask.isCancelled || hasDesc || hasDue {
+        if !subtask.isSkippable || subtask.isCancelled || hasDesc || hasDue {
             HStack(spacing: 6) {
+                if !subtask.isSkippable {
+                    HStack(spacing: 3) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 8))
+                        Text(L10n.Tasks.subtaskMandatory)
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.red.opacity(0.12))
+                    .foregroundColor(.red)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+
                 if subtask.isCancelled {
                     HStack(spacing: 3) {
                         Image(systemName: "slash.circle")
@@ -1245,6 +1266,12 @@ public struct SubtaskItemRowView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
 
+            Toggle(isOn: $editIsSkippable) {
+                Label(L10n.Tasks.subtaskSkippable, systemImage: editIsSkippable ? "checkmark.circle" : "lock.fill")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .tint(AppColors.primary)
+
             if !isRecurring {
                 dueDatePicker
             }
@@ -1294,22 +1321,24 @@ public struct SubtaskItemRowView: View {
     @ViewBuilder
     private var editorButtons: some View {
         HStack(spacing: 8) {
-            Button(action: {
-                onToggleCancel()
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: subtask.isCancelled ? "arrow.uturn.backward" : "slash.circle")
-                        .font(.system(size: 10, weight: .bold))
-                    Text(subtask.isCancelled ? L10n.Tasks.unskipSubtask : L10n.Tasks.skipSubtask)
-                        .font(.system(size: 11, weight: .medium))
+            if subtask.isCancelled || subtask.isSkippable {
+                Button(action: {
+                    onToggleCancel()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: subtask.isCancelled ? "arrow.uturn.backward" : "slash.circle")
+                            .font(.system(size: 10, weight: .bold))
+                        Text(subtask.isCancelled ? L10n.Tasks.unskipSubtask : L10n.Tasks.skipSubtask)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(subtask.isCancelled ? AppColors.primary : .orange)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background((subtask.isCancelled ? AppColors.primary : Color.orange).opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
-                .foregroundColor(subtask.isCancelled ? AppColors.primary : .orange)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background((subtask.isCancelled ? AppColors.primary : Color.orange).opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
             Spacer()
             Button(action: handleCancel) {
@@ -1367,6 +1396,7 @@ public struct AddSubtaskSectionView: View {
     @State private var newSubtaskDescription: String = ""
     @State private var hasDueDate: Bool = false
     @State private var newSubtaskDueDate: Date = Date().addingTimeInterval(3600 * 4)
+    @State private var newSubtaskSkippable: Bool = true
     @State private var isShowingDetails: Bool = false
     @State private var isAdding: Bool = false
     @State private var errorMessage: String? = nil
@@ -1406,7 +1436,8 @@ public struct AddSubtaskSectionView: View {
                 taskId: taskId,
                 title: trimmedTitle,
                 description: descParam,
-                dueDate: dueParam
+                dueDate: dueParam,
+                isSkippable: newSubtaskSkippable
             )
             await MainActor.run {
                 isAdding = false
@@ -1414,6 +1445,7 @@ public struct AddSubtaskSectionView: View {
                     newSubtaskTitle = ""
                     newSubtaskDescription = ""
                     hasDueDate = false
+                    newSubtaskSkippable = true
                     isShowingDetails = false
                 } else {
                     errorMessage = viewModel.errorMessage ?? L10n.Tasks.addSubtaskFailed
@@ -1504,6 +1536,12 @@ public struct AddSubtaskSectionView: View {
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
                 )
+
+            Toggle(isOn: $newSubtaskSkippable) {
+                Label(L10n.Tasks.subtaskSkippable, systemImage: newSubtaskSkippable ? "checkmark.circle" : "lock.fill")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .tint(AppColors.primary)
 
             if !isRecurring {
                 Toggle(isOn: $hasDueDate.animation()) {

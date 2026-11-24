@@ -45,6 +45,7 @@ type SubtaskResponse struct {
 	Description string     `json:"description" db:"description"`
 	IsCompleted bool       `json:"is_completed" db:"is_completed"`
 	IsCancelled bool       `json:"is_cancelled" db:"is_cancelled"`
+	IsSkippable bool       `json:"is_skippable" db:"is_skippable"`
 	OrderIndex  int        `json:"order_index" db:"order_index"`
 	DueDate     *time.Time `json:"due_date" db:"due_date"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
@@ -56,6 +57,7 @@ type CreateTaskSubtaskItem struct {
 	Title       string     `json:"title" validate:"required,min=1,max=255"`
 	Description string     `json:"description"`
 	DueDate     *time.Time `json:"due_date"`
+	IsSkippable *bool      `json:"is_skippable"`
 }
 
 // CreateTaskRequest payload for creating a new task.
@@ -152,6 +154,9 @@ func (c *CreateTaskRequest) UnmarshalJSON(data []byte) error {
 							if err == nil {
 								stItem.DueDate = t
 							}
+						}
+						if skVal, ok := v["is_skippable"].(bool); ok {
+							stItem.IsSkippable = &skVal
 						}
 						if stItem.Title != "" {
 							items = append(items, stItem)
@@ -312,12 +317,14 @@ type CreateSubtaskRequest struct {
 	Title       string     `json:"title" validate:"required,min=1,max=255"`
 	Description string     `json:"description"`
 	DueDate     *time.Time `json:"due_date"`
+	IsSkippable *bool      `json:"is_skippable"`
 }
 
 func (c *CreateSubtaskRequest) UnmarshalJSON(data []byte) error {
 	type Alias struct {
 		Title       string `json:"title" validate:"required,min=1,max=255"`
 		Description string `json:"description"`
+		IsSkippable *bool  `json:"is_skippable"`
 	}
 	var aux Alias
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -325,6 +332,7 @@ func (c *CreateSubtaskRequest) UnmarshalJSON(data []byte) error {
 	}
 	c.Title = aux.Title
 	c.Description = aux.Description
+	c.IsSkippable = aux.IsSkippable
 
 	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err == nil {
@@ -347,6 +355,7 @@ type UpdateSubtaskRequest struct {
 	HasDescription   bool       `json:"-"`
 	IsCompleted      *bool      `json:"is_completed"`
 	IsCancelled      *bool      `json:"is_cancelled"`
+	IsSkippable      *bool      `json:"is_skippable"`
 	DueDate          *time.Time `json:"due_date"`
 	ClearDueDate     bool       `json:"clear_due_date"`
 	HasDueDate       bool       `json:"-"`
@@ -360,6 +369,7 @@ func (u *UpdateSubtaskRequest) UnmarshalJSON(data []byte) error {
 		ClearDescription bool    `json:"clear_description"`
 		IsCompleted      *bool   `json:"is_completed"`
 		IsCancelled      *bool   `json:"is_cancelled"`
+		IsSkippable      *bool   `json:"is_skippable"`
 		ClearDueDate     bool    `json:"clear_due_date"`
 	}
 	var aux Alias
@@ -371,6 +381,7 @@ func (u *UpdateSubtaskRequest) UnmarshalJSON(data []byte) error {
 	u.ClearDescription = aux.ClearDescription
 	u.IsCompleted = aux.IsCompleted
 	u.IsCancelled = aux.IsCancelled
+	u.IsSkippable = aux.IsSkippable
 	u.ClearDueDate = aux.ClearDueDate
 
 	var raw map[string]interface{}
@@ -583,6 +594,7 @@ type RecurringSubtaskResponse struct {
 	RecurringTaskID int64     `json:"recurring_task_id" db:"recurring_task_id"`
 	Title           string    `json:"title" db:"title"`
 	Description     string    `json:"description" db:"description"`
+	IsSkippable     bool      `json:"is_skippable" db:"is_skippable"`
 	OrderIndex      int       `json:"order_index" db:"order_index"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 }
@@ -648,6 +660,7 @@ func (c *CreateRecurringTaskRequest) UnmarshalJSON(data []byte) error {
 type CreateRecurringSubtaskItem struct {
 	Title       string `json:"title" validate:"required,min=1,max=255"`
 	Description string `json:"description"`
+	IsSkippable *bool  `json:"is_skippable"`
 	OrderIndex  int    `json:"order_index"`
 }
 

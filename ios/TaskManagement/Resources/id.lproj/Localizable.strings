@@ -121,6 +121,8 @@
 "tasks.subtasksCountShort" = "%lld subtugas";
 "tasks.updateSubtaskFailed" = "Gagal memperbarui subtask";
 "tasks.addSubtaskFailed" = "Gagal menambahkan subtask";
+"tasks.subtaskSkippable" = "Dapat dilewati";
+"tasks.subtaskMandatory" = "Wajib";
 "tasks.deleteRecurring" = "Hapus Template";
 
 /* Projects */

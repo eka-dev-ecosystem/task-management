@@ -815,7 +815,8 @@ export const useUpdateSubtask = () => {
       description,
       dueDate,
       isCompleted,
-      isCancelled
+      isCancelled,
+      isSkippable
     }: {
       taskId: number
       subtaskId: number
@@ -824,13 +825,15 @@ export const useUpdateSubtask = () => {
       dueDate?: string | null
       isCompleted?: boolean
       isCancelled?: boolean
+      isSkippable?: boolean
     }) => {
       const res = await taskApi.updateSubtask(taskId, subtaskId, {
         title,
         description,
         due_date: dueDate,
         is_completed: isCompleted,
-        is_cancelled: isCancelled
+        is_cancelled: isCancelled,
+        is_skippable: isSkippable
       })
       return { taskId, subtask: res.data }
     },

@@ -302,7 +302,7 @@ func (r *repository) fetchSubtasks(ctx context.Context, tx *sqlx.Tx, taskID int6
 		return nil, errors.New("transaction is required")
 	}
 	query := `
-		SELECT id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at
+		SELECT id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, is_skippable, order_index, due_date, created_at, updated_at
 		FROM subtasks
 		WHERE task_id = $1
 		ORDER BY order_index ASC, id ASC
@@ -371,14 +371,18 @@ func (r *repository) Create(ctx context.Context, tx *sqlx.Tx, userID string, req
 			var valueArgs []interface{}
 			argIdx := 1
 			for i, st := range validSubtasks {
-				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, FALSE, FALSE, $%d, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3, argIdx+4))
-				valueArgs = append(valueArgs, entity.ID, strings.TrimSpace(st.Title), strings.TrimSpace(st.Description), i, st.DueDate)
-				argIdx += 5
+				isSkippable := true
+				if st.IsSkippable != nil {
+					isSkippable = *st.IsSkippable
+				}
+				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, FALSE, FALSE, $%d, $%d, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3, argIdx+4, argIdx+5))
+				valueArgs = append(valueArgs, entity.ID, strings.TrimSpace(st.Title), strings.TrimSpace(st.Description), isSkippable, i, st.DueDate)
+				argIdx += 6
 			}
 			batchQuery := fmt.Sprintf(`
-				INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at)
+				INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, is_skippable, order_index, due_date, created_at, updated_at)
 				VALUES %s
-				RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at
+				RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, is_skippable, order_index, due_date, created_at, updated_at
 			`, strings.Join(valueStrings, ", "))
 
 			rows, err := tx.QueryxContext(ctx, batchQuery, valueArgs...)
@@ -799,13 +803,17 @@ func (r *repository) CreateSubtask(ctx context.Context, tx *sqlx.Tx, userID stri
 		return nil, errors.New("task not found or unauthorized")
 	}
 
+	isSkippable := true
+	if req.IsSkippable != nil {
+		isSkippable = *req.IsSkippable
+	}
 	query := `
-		INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at)
-		VALUES ($1, $2, $3, FALSE, FALSE, (SELECT COALESCE(MAX(order_index) + 1, 0) FROM subtasks WHERE task_id = $1), $4, NOW(), NOW())
-		RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at
+		INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, is_skippable, order_index, due_date, created_at, updated_at)
+		VALUES ($1, $2, $3, FALSE, FALSE, $4, (SELECT COALESCE(MAX(order_index) + 1, 0) FROM subtasks WHERE task_id = $1), $5, NOW(), NOW())
+		RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, is_skippable, order_index, due_date, created_at, updated_at
 	`
 	var st SubtaskResponse
-	err = tx.QueryRowxContext(ctx, query, taskID, req.Title, req.Description, req.DueDate).StructScan(&st)
+	err = tx.QueryRowxContext(ctx, query, taskID, req.Title, req.Description, isSkippable, req.DueDate).StructScan(&st)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subtask: %w", err)
 	}
@@ -823,7 +831,7 @@ func (r *repository) UpdateSubtask(ctx context.Context, tx *sqlx.Tx, userID stri
 	}
 
 	var existing SubtaskResponse
-	err = tx.GetContext(ctx, &existing, `SELECT id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at FROM subtasks WHERE id = $1 AND task_id = $2`, subtaskID, taskID)
+	err = tx.GetContext(ctx, &existing, `SELECT id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, is_skippable, order_index, due_date, created_at, updated_at FROM subtasks WHERE id = $1 AND task_id = $2`, subtaskID, taskID)
 	if err != nil {
 		return nil, fmt.Errorf("subtask not found: %w", err)
 	}
@@ -846,6 +854,10 @@ func (r *repository) UpdateSubtask(ctx context.Context, tx *sqlx.Tx, userID stri
 	}
 	isCompleted := existing.IsCompleted
 	isCancelled := existing.IsCancelled
+	isSkippable := existing.IsSkippable
+	if req.IsSkippable != nil {
+		isSkippable = *req.IsSkippable
+	}
 	if req.IsCancelled != nil {
 		isCancelled = *req.IsCancelled
 		if isCancelled {
@@ -869,12 +881,12 @@ func (r *repository) UpdateSubtask(ctx context.Context, tx *sqlx.Tx, userID stri
 
 	query := `
 		UPDATE subtasks
-		SET title = $1, description = $2, is_completed = $3, is_cancelled = $4, due_date = $5, updated_at = NOW()
-		WHERE id = $6 AND task_id = $7
-		RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, order_index, due_date, created_at, updated_at
+		SET title = $1, description = $2, is_completed = $3, is_cancelled = $4, is_skippable = $5, due_date = $6, updated_at = NOW()
+		WHERE id = $7 AND task_id = $8
+		RETURNING id, task_id, title, COALESCE(description, '') AS description, is_completed, is_cancelled, is_skippable, order_index, due_date, created_at, updated_at
 	`
 	var updated SubtaskResponse
-	err = tx.QueryRowxContext(ctx, query, title, description, isCompleted, isCancelled, dueDate, subtaskID, taskID).StructScan(&updated)
+	err = tx.QueryRowxContext(ctx, query, title, description, isCompleted, isCancelled, isSkippable, dueDate, subtaskID, taskID).StructScan(&updated)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update subtask: %w", err)
 	}
@@ -1320,7 +1332,7 @@ func (r *repository) fetchRecurringSubtasks(ctx context.Context, tx *sqlx.Tx, re
 		return nil, errors.New("transaction is required")
 	}
 	query := `
-		SELECT id, recurring_task_id, title, COALESCE(description, '') AS description, order_index, created_at
+		SELECT id, recurring_task_id, title, COALESCE(description, '') AS description, is_skippable, order_index, created_at
 		FROM recurring_subtasks
 		WHERE recurring_task_id = $1
 		ORDER BY order_index ASC, id ASC
@@ -1524,12 +1536,16 @@ func (r *repository) CreateRecurring(ctx context.Context, tx *sqlx.Tx, userID st
 				if orderIdx <= 0 {
 					orderIdx = i
 				}
-				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3))
-				valueArgs = append(valueArgs, entity.ID, st.Title, st.Description, orderIdx)
-				argIdx += 4
+				isSkippable := true
+				if st.IsSkippable != nil {
+					isSkippable = *st.IsSkippable
+				}
+				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3, argIdx+4))
+				valueArgs = append(valueArgs, entity.ID, st.Title, st.Description, isSkippable, orderIdx)
+				argIdx += 5
 			}
 			batchQuery := fmt.Sprintf(`
-				INSERT INTO recurring_subtasks (recurring_task_id, title, description, order_index, created_at, updated_at)
+				INSERT INTO recurring_subtasks (recurring_task_id, title, description, is_skippable, order_index, created_at, updated_at)
 				VALUES %s
 			`, strings.Join(valueStrings, ", "))
 			if _, err := tx.ExecContext(ctx, batchQuery, valueArgs...); err != nil {
@@ -1653,12 +1669,16 @@ func (r *repository) UpdateRecurring(ctx context.Context, tx *sqlx.Tx, userID st
 				if orderIdx <= 0 {
 					orderIdx = i
 				}
-				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3))
-				valueArgs = append(valueArgs, id, st.Title, st.Description, orderIdx)
-				argIdx += 4
+				isSkippable := true
+				if st.IsSkippable != nil {
+					isSkippable = *st.IsSkippable
+				}
+				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3, argIdx+4))
+				valueArgs = append(valueArgs, id, st.Title, st.Description, isSkippable, orderIdx)
+				argIdx += 5
 			}
 			batchQuery := fmt.Sprintf(`
-				INSERT INTO recurring_subtasks (recurring_task_id, title, description, order_index, created_at, updated_at)
+				INSERT INTO recurring_subtasks (recurring_task_id, title, description, is_skippable, order_index, created_at, updated_at)
 				VALUES %s
 			`, strings.Join(valueStrings, ", "))
 			if _, err := tx.ExecContext(ctx, batchQuery, valueArgs...); err != nil {
@@ -1783,12 +1803,12 @@ func (r *repository) CreateInstanceFromRecurring(ctx context.Context, tx *sqlx.T
 			var valueArgs []interface{}
 			argIdx := 1
 			for _, st := range validItems {
-				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, FALSE, FALSE, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3))
-				valueArgs = append(valueArgs, entity.ID, st.Title, st.Description, st.OrderIndex)
-				argIdx += 4
+				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, FALSE, FALSE, $%d, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3, argIdx+4))
+				valueArgs = append(valueArgs, entity.ID, st.Title, st.Description, st.IsSkippable, st.OrderIndex)
+				argIdx += 5
 			}
 			batchQuery := fmt.Sprintf(`
-				INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, order_index, created_at, updated_at)
+				INSERT INTO subtasks (task_id, title, description, is_completed, is_cancelled, is_skippable, order_index, created_at, updated_at)
 				VALUES %s
 			`, strings.Join(valueStrings, ", "))
 			if _, err := tx.ExecContext(ctx, batchQuery, valueArgs...); err != nil {
@@ -1976,12 +1996,12 @@ func (r *repository) ConvertTaskToRecurring(ctx context.Context, tx *sqlx.Tx, us
 				if orderIdx <= 0 {
 					orderIdx = i
 				}
-				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3))
-				valueArgs = append(valueArgs, entity.ID, st.Title, st.Description, orderIdx)
-				argIdx += 4
+				valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, NOW(), NOW())", argIdx, argIdx+1, argIdx+2, argIdx+3, argIdx+4))
+				valueArgs = append(valueArgs, entity.ID, st.Title, st.Description, st.IsSkippable, orderIdx)
+				argIdx += 5
 			}
 			batchQuery := fmt.Sprintf(`
-				INSERT INTO recurring_subtasks (recurring_task_id, title, description, order_index, created_at, updated_at)
+				INSERT INTO recurring_subtasks (recurring_task_id, title, description, is_skippable, order_index, created_at, updated_at)
 				VALUES %s
 			`, strings.Join(valueStrings, ", "))
 			if _, err := tx.ExecContext(ctx, batchQuery, valueArgs...); err != nil {

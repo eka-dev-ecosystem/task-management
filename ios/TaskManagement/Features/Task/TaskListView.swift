@@ -1020,6 +1020,7 @@ public struct CreateTaskSheet: View {
     @State private var newSubtaskDescription: String = ""
     @State private var hasSubtaskDueDate: Bool = false
     @State private var newSubtaskDueDate: Date = Date().addingTimeInterval(3600 * 4)
+    @State private var newSubtaskSkippable: Bool = true
     @State private var isShowingSubtaskDetails: Bool = false
     @State private var isSubmitting: Bool = false
     @State private var errorMessage: String? = nil
@@ -1160,8 +1161,22 @@ public struct CreateTaskSheet: View {
 
                                 let hasDesc = (item.description != nil && !item.description!.isEmpty)
                                 let hasDue = !isRecurring && (item.dueDate != nil && !item.dueDate!.isEmpty)
-                                if hasDesc || hasDue {
+                                if !item.isSkippable || hasDesc || hasDue {
                                     HStack(spacing: 6) {
+                                        if !item.isSkippable {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "lock.fill")
+                                                    .font(.system(size: 8))
+                                                Text(L10n.Tasks.subtaskMandatory)
+                                                    .font(.system(size: 10, weight: .semibold))
+                                            }
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(Color.red.opacity(0.12))
+                                            .foregroundColor(.red)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                        }
+
                                         if let desc = item.description, !desc.isEmpty {
                                             HStack(spacing: 3) {
                                                 Image(systemName: "text.alignleft")
@@ -1261,6 +1276,12 @@ public struct CreateTaskSheet: View {
                                         RoundedRectangle(cornerRadius: 6)
                                             .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
                                     )
+
+                                Toggle(isOn: $newSubtaskSkippable) {
+                                    Label(L10n.Tasks.subtaskSkippable, systemImage: newSubtaskSkippable ? "checkmark.circle" : "lock.fill")
+                                        .font(.system(size: 12, weight: .medium))
+                                }
+                                .tint(AppColors.primary)
 
                                 if !isRecurring {
                                     Toggle(isOn: $hasSubtaskDueDate.animation()) {
@@ -1370,12 +1391,14 @@ public struct CreateTaskSheet: View {
         let item = CreateTaskSubtaskItem(
             title: trimmedTitle,
             description: descParam,
-            dueDate: dueParam
+            dueDate: dueParam,
+            isSkippable: newSubtaskSkippable
         )
         subtasks.append(item)
         newSubtaskTitle = ""
         newSubtaskDescription = ""
         hasSubtaskDueDate = false
+        newSubtaskSkippable = true
         isShowingSubtaskDetails = false
     }
 
@@ -1415,7 +1438,8 @@ public struct CreateTaskSheet: View {
             finalSubtasks.append(CreateTaskSubtaskItem(
                 title: pendingTitle,
                 description: descParam,
-                dueDate: dueParam
+                dueDate: dueParam,
+                isSkippable: newSubtaskSkippable
             ))
         }
 
@@ -1821,6 +1845,13 @@ struct RecurringTaskCardView: View {
     }
 }
 
+// MARK: - Recurring Subtask Input Helper
+struct RecurringSubtaskInput: Identifiable, Equatable {
+    let id: UUID = UUID()
+    var title: String
+    var isSkippable: Bool = true
+}
+
 // MARK: - Create Recurring Task Sheet
 struct CreateRecurringTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -1834,8 +1865,9 @@ struct CreateRecurringTaskSheet: View {
     @State private var recurrenceInterval: Int = 1
     @State private var hasDueTime: Bool = false
     @State private var dueTimeDate: Date = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
-    @State private var subtasks: [String] = []
+    @State private var subtasks: [RecurringSubtaskInput] = []
     @State private var newSubtaskText: String = ""
+    @State private var newSubtaskSkippable: Bool = true
     @State private var isSubmitting: Bool = false
     @State private var errorMessage: String? = nil
 
@@ -1913,16 +1945,35 @@ struct CreateRecurringTaskSheet: View {
                             .fontWeight(.bold)
                     }
                 }) {
-                    ForEach(Array(subtasks.enumerated()), id: \.offset) { index, item in
+                    ForEach(Array(subtasks.enumerated()), id: \.element.id) { index, item in
                         HStack {
                             Image(systemName: "checkmark.circle")
                                 .foregroundColor(.secondary)
                                 .font(.system(size: 14))
-                            Text(item)
+                            Text(item.title)
                                 .font(.system(size: 14))
                             Spacer()
+                            Button {
+                                if let idx = subtasks.firstIndex(where: { $0.id == item.id }) {
+                                    subtasks[idx].isSkippable.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Image(systemName: item.isSkippable ? "checkmark" : "lock.fill")
+                                        .font(.system(size: 8))
+                                    Text(item.isSkippable ? L10n.Tasks.subtaskSkippable : L10n.Tasks.subtaskMandatory)
+                                        .font(.system(size: 10, weight: .semibold))
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background((item.isSkippable ? Color.secondary : Color.red).opacity(0.12))
+                                .foregroundColor(item.isSkippable ? .secondary : .red)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                            .buttonStyle(.plain)
+
                             Button(role: .destructive) {
-                                subtasks.remove(at: index)
+                                subtasks.removeAll { $0.id == item.id }
                             } label: {
                                 Image(systemName: "trash")
                                     .foregroundColor(.red.opacity(0.8))
@@ -1932,20 +1983,28 @@ struct CreateRecurringTaskSheet: View {
                         }
                     }
 
-                    HStack {
-                        TextField(L10n.Tasks.addSubtaskPlaceholder, text: $newSubtaskText)
-                            .font(.system(size: 14))
-                            .onSubmit {
-                                addSubtask()
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            TextField(L10n.Tasks.addSubtaskPlaceholder, text: $newSubtaskText)
+                                .font(.system(size: 14))
+                                .onSubmit {
+                                    addSubtask()
+                                }
+                            if !newSubtaskText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                Button(action: addSubtask) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(AppColors.primary)
+                                }
+                                .buttonStyle(.plain)
                             }
-                        if !newSubtaskText.trimmingCharacters(in: .whitespaces).isEmpty {
-                            Button(action: addSubtask) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(AppColors.primary)
-                            }
-                            .buttonStyle(.plain)
                         }
+
+                        Toggle(isOn: $newSubtaskSkippable) {
+                            Label(L10n.Tasks.subtaskSkippable, systemImage: newSubtaskSkippable ? "checkmark.circle" : "lock.fill")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .tint(AppColors.primary)
                     }
                 }
             }
@@ -1974,8 +2033,9 @@ struct CreateRecurringTaskSheet: View {
     private func addSubtask() {
         let text = newSubtaskText.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
-        subtasks.append(text)
+        subtasks.append(RecurringSubtaskInput(title: text, isSkippable: newSubtaskSkippable))
         newSubtaskText = ""
+        newSubtaskSkippable = true
     }
 
     private func handleSave() {
@@ -1995,11 +2055,11 @@ struct CreateRecurringTaskSheet: View {
         var finalSubtasks = subtasks
         let pending = newSubtaskText.trimmingCharacters(in: .whitespaces)
         if !pending.isEmpty {
-            finalSubtasks.append(pending)
+            finalSubtasks.append(RecurringSubtaskInput(title: pending, isSkippable: newSubtaskSkippable))
         }
 
         let subtaskItems: [CreateRecurringSubtaskItem]? = finalSubtasks.isEmpty ? nil : finalSubtasks.enumerated().map { index, s in
-            CreateRecurringSubtaskItem(title: s, orderIndex: index)
+            CreateRecurringSubtaskItem(title: s.title, isSkippable: s.isSkippable, orderIndex: index)
         }
 
         let req = CreateRecurringTaskRequest(
@@ -2043,8 +2103,9 @@ struct EditRecurringTaskSheet: View {
     @State private var isActive: Bool
     @State private var hasDueTime: Bool
     @State private var dueTimeDate: Date
-    @State private var subtasks: [String]
+    @State private var subtasks: [RecurringSubtaskInput]
     @State private var newSubtaskText: String = ""
+    @State private var newSubtaskSkippable: Bool = true
     @State private var isSubmitting: Bool = false
     @State private var showDeleteAlert: Bool = false
     @State private var errorMessage: String? = nil
@@ -2075,7 +2136,9 @@ struct EditRecurringTaskSheet: View {
             _dueTimeDate = State(initialValue: Date())
         }
 
-        let initialSubtasks = (item.subtasks ?? []).map { $0.title }
+        let initialSubtasks = (item.subtasks ?? []).map {
+            RecurringSubtaskInput(title: $0.title, isSkippable: $0.isSkippable)
+        }
         _subtasks = State(initialValue: initialSubtasks)
     }
 
@@ -2154,16 +2217,35 @@ struct EditRecurringTaskSheet: View {
                             .fontWeight(.bold)
                     }
                 }) {
-                    ForEach(Array(subtasks.enumerated()), id: \.offset) { index, s in
+                    ForEach(Array(subtasks.enumerated()), id: \.element.id) { index, item in
                         HStack {
                             Image(systemName: "checkmark.circle")
                                 .foregroundColor(.secondary)
                                 .font(.system(size: 14))
-                            Text(s)
+                            Text(item.title)
                                 .font(.system(size: 14))
                             Spacer()
+                            Button {
+                                if let idx = subtasks.firstIndex(where: { $0.id == item.id }) {
+                                    subtasks[idx].isSkippable.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Image(systemName: item.isSkippable ? "checkmark" : "lock.fill")
+                                        .font(.system(size: 8))
+                                    Text(item.isSkippable ? L10n.Tasks.subtaskSkippable : L10n.Tasks.subtaskMandatory)
+                                        .font(.system(size: 10, weight: .semibold))
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background((item.isSkippable ? Color.secondary : Color.red).opacity(0.12))
+                                .foregroundColor(item.isSkippable ? .secondary : .red)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                            .buttonStyle(.plain)
+
                             Button(role: .destructive) {
-                                subtasks.remove(at: index)
+                                subtasks.removeAll { $0.id == item.id }
                             } label: {
                                 Image(systemName: "trash")
                                     .foregroundColor(.red.opacity(0.8))
@@ -2173,20 +2255,28 @@ struct EditRecurringTaskSheet: View {
                         }
                     }
 
-                    HStack {
-                        TextField(L10n.Tasks.addSubtaskPlaceholder, text: $newSubtaskText)
-                            .font(.system(size: 14))
-                            .onSubmit {
-                                addSubtask()
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            TextField(L10n.Tasks.addSubtaskPlaceholder, text: $newSubtaskText)
+                                .font(.system(size: 14))
+                                .onSubmit {
+                                    addSubtask()
+                                }
+                            if !newSubtaskText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                Button(action: addSubtask) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(AppColors.primary)
+                                }
+                                .buttonStyle(.plain)
                             }
-                        if !newSubtaskText.trimmingCharacters(in: .whitespaces).isEmpty {
-                            Button(action: addSubtask) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(AppColors.primary)
-                            }
-                            .buttonStyle(.plain)
                         }
+
+                        Toggle(isOn: $newSubtaskSkippable) {
+                            Label(L10n.Tasks.subtaskSkippable, systemImage: newSubtaskSkippable ? "checkmark.circle" : "lock.fill")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .tint(AppColors.primary)
                     }
                 }
 
@@ -2239,8 +2329,9 @@ struct EditRecurringTaskSheet: View {
     private func addSubtask() {
         let text = newSubtaskText.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
-        subtasks.append(text)
+        subtasks.append(RecurringSubtaskInput(title: text, isSkippable: newSubtaskSkippable))
         newSubtaskText = ""
+        newSubtaskSkippable = true
     }
 
     private func handleSave() {
@@ -2260,11 +2351,11 @@ struct EditRecurringTaskSheet: View {
         var finalSubtasks = subtasks
         let pending = newSubtaskText.trimmingCharacters(in: .whitespaces)
         if !pending.isEmpty {
-            finalSubtasks.append(pending)
+            finalSubtasks.append(RecurringSubtaskInput(title: pending, isSkippable: newSubtaskSkippable))
         }
 
         let subtaskItems: [CreateRecurringSubtaskItem]? = finalSubtasks.isEmpty ? nil : finalSubtasks.enumerated().map { index, s in
-            CreateRecurringSubtaskItem(title: s, orderIndex: index)
+            CreateRecurringSubtaskItem(title: s.title, isSkippable: s.isSkippable, orderIndex: index)
         }
 
         let req = UpdateRecurringTaskRequest(

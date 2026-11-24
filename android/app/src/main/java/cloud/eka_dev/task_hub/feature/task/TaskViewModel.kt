@@ -368,7 +368,8 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
         taskId: Long,
         title: String,
         description: String? = null,
-        dueDate: String? = null
+        dueDate: String? = null,
+        isSkippable: Boolean? = null
     ) {
         if (title.isBlank()) return
         viewModelScope.launch {
@@ -378,7 +379,8 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
                     CreateSubtaskRequest(
                         title = title.trim(),
                         description = description?.trim()?.ifEmpty { null },
-                        dueDate = dueDate
+                        dueDate = dueDate,
+                        isSkippable = isSkippable
                     )
                 )
                 if (res.success && res.data != null) {
@@ -414,7 +416,8 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
         description: String? = null,
         dueDate: String? = null,
         isCompleted: Boolean? = null,
-        isCancelled: Boolean? = null
+        isCancelled: Boolean? = null,
+        isSkippable: Boolean? = null
     ) {
         viewModelScope.launch {
             try {
@@ -426,7 +429,8 @@ class TaskViewModel(private val apiClient: ApiClient) : ViewModel() {
                         description = description,
                         dueDate = dueDate,
                         isCompleted = isCompleted,
-                        isCancelled = isCancelled
+                        isCancelled = isCancelled,
+                        isSkippable = isSkippable
                     )
                 )
                 if (res.success && res.data != null) {

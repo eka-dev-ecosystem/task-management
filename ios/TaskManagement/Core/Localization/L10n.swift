@@ -108,6 +108,8 @@ public enum L10n {
         public static var subtaskSkipped: String { "tasks.subtaskSkipped".localized }
         public static var skipSubtask: String { "tasks.skipSubtask".localized }
         public static var unskipSubtask: String { "tasks.unskipSubtask".localized }
+        public static var subtaskSkippable: String { "tasks.subtaskSkippable".localized }
+        public static var subtaskMandatory: String { "tasks.subtaskMandatory".localized }
         public static var sectionTags: String { "tasks.sectionTags".localized }
         public static var tagsPlaceholder: String { "tasks.tagsPlaceholder".localized }
         public static var statusHeader: String { "tasks.statusHeader".localized }

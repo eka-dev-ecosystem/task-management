@@ -117,6 +117,10 @@ export const taskDrawer = {
   subtaskSkipped: 'Skipped',
   skipSubtask: 'Skip Subtask',
   unskipSubtask: 'Reactivate Subtask',
+  subtaskSkippable: 'Can be skipped (optional)',
+  subtaskMandatory: 'Required',
+  subtaskMandatoryNote: 'This subtask is required and cannot be skipped',
+  subtaskNotSkippableTooltip: 'This subtask is required and cannot be skipped',
   deleteTaskConfirmHeader: 'Delete Task',
   deleteTaskConfirmMessage:
     'Are you sure you want to delete this task? This action cannot be undone.',
@@ -227,6 +231,12 @@ export const recurring = {
     activeStatusLabel: 'Active Template Status',
     subtasksLabel: 'Subtasks Template (Default Checklist)',
     subtaskPlaceholder: 'Add step item...',
+    subtaskSkippableLabel: 'Can be skipped during execution',
+    subtaskMandatoryNote: 'This subtask will be mandatory',
+    subtaskSkippableTooltip: 'Click to make mandatory',
+    subtaskMandatoryTooltip: 'Click to make skippable',
+    skippableBadge: 'Optional',
+    mandatoryBadge: 'Required',
     addSubtaskBtn: 'Add'
   }
 }

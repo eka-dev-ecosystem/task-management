@@ -116,6 +116,10 @@ export const taskDrawer = {
   subtaskSkipped: 'Dilewati',
   skipSubtask: 'Lewati Subtugas',
   unskipSubtask: 'Aktifkan Kembali',
+  subtaskSkippable: 'Dapat dilewati (opsional)',
+  subtaskMandatory: 'Wajib',
+  subtaskMandatoryNote: 'Subtask ini wajib dan tidak dapat dilewati',
+  subtaskNotSkippableTooltip: 'Subtask ini wajib dikerjakan dan tidak dapat dilewati',
   deleteTaskConfirmHeader: 'Hapus Tugas',
   deleteTaskConfirmMessage:
     'Apakah Anda yakin ingin menghapus tugas ini? Tindakan ini tidak dapat dibatalkan.',
@@ -226,6 +230,12 @@ export const recurring = {
     activeStatusLabel: 'Status Template Aktif',
     subtasksLabel: 'Template Subtask (Checklist Bawaan)',
     subtaskPlaceholder: 'Tambahkan butir langkah...',
+    subtaskSkippableLabel: 'Dapat dilewati saat dikerjakan',
+    subtaskMandatoryNote: 'Subtask ini akan wajib dikerjakan',
+    subtaskSkippableTooltip: 'Klik untuk ubah menjadi wajib',
+    subtaskMandatoryTooltip: 'Klik untuk ubah menjadi dapat dilewati',
+    skippableBadge: 'Opsional',
+    mandatoryBadge: 'Wajib',
     addSubtaskBtn: 'Tambah'
   }
 }

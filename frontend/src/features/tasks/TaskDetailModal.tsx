@@ -35,6 +35,7 @@ interface SubtaskItemRowProps {
     title?: string
     description?: string
     dueDate?: string | null
+    isSkippable?: boolean
   }) => Promise<unknown>
 }
 
@@ -54,13 +55,15 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
   const [editDueDate, setEditDueDate] = useState<Date | null>(
     subtask.due_date ? new Date(subtask.due_date) : null
   )
+  const [editIsSkippable, setEditIsSkippable] = useState(subtask.is_skippable ?? true)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     setEditTitle(subtask.title)
     setEditDescription(subtask.description || '')
     setEditDueDate(subtask.due_date ? new Date(subtask.due_date) : null)
-  }, [subtask.title, subtask.description, subtask.due_date])
+    setEditIsSkippable(subtask.is_skippable ?? true)
+  }, [subtask.title, subtask.description, subtask.due_date, subtask.is_skippable])
 
   const handleSave = async () => {
     if (!editTitle.trim()) return
@@ -71,7 +74,8 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
         subtaskId: subtask.id,
         title: editTitle.trim(),
         description: editDescription.trim(),
-        dueDate: isRecurring ? null : (editDueDate ? editDueDate.toISOString() : null)
+        dueDate: isRecurring ? null : (editDueDate ? editDueDate.toISOString() : null),
+        isSkippable: editIsSkippable
       })
       setIsExpanded(false)
     } finally {
@@ -83,6 +87,7 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
     setEditTitle(subtask.title)
     setEditDescription(subtask.description || '')
     setEditDueDate(subtask.due_date ? new Date(subtask.due_date) : null)
+    setEditIsSkippable(subtask.is_skippable ?? true)
     setIsExpanded(false)
   }
 
@@ -131,6 +136,13 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
 
             {/* Badges: Due Date & Notes Preview */}
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              {subtask.is_skippable === false && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
+                  <i className="pi pi-lock text-[9px]" />
+                  {t('taskDrawer.subtaskMandatory')}
+                </span>
+              )}
+
               {subtask.is_cancelled && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
                   <i className="pi pi-ban text-[9px]" />
@@ -172,16 +184,21 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
         <div className="flex items-center gap-1 shrink-0 pt-0.5">
           <button
             type="button"
+            disabled={subtask.is_skippable === false}
             onClick={() => onToggleCancel(!subtask.is_cancelled)}
             data-pr-tooltip={
-              subtask.is_cancelled
+              subtask.is_skippable === false
+                ? t('taskDrawer.subtaskNotSkippableTooltip')
+                : subtask.is_cancelled
                 ? t('taskDrawer.unskipSubtask')
                 : t('taskDrawer.skipSubtask')
             }
-            className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
-              subtask.is_cancelled
-                ? 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400'
-                : 'border-transparent text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50'
+            className={`p-1.5 rounded-lg border text-xs transition-colors ${
+              subtask.is_skippable === false
+                ? 'opacity-40 cursor-not-allowed border-transparent text-slate-300 dark:text-slate-600'
+                : subtask.is_cancelled
+                ? 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 cursor-pointer'
+                : 'border-transparent text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50 cursor-pointer'
             }`}
           >
             <i className={`pi ${subtask.is_cancelled ? 'pi-undo' : 'pi-ban'} text-[10px]`} />
@@ -276,14 +293,37 @@ const SubtaskItemRow: React.FC<SubtaskItemRowProps> = ({
             </div>
           )}
 
+          <div className="flex items-center justify-between py-1">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={editIsSkippable}
+                onChange={(e) => setEditIsSkippable(e.target.checked)}
+                className="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-indigo-600 focus:ring-0 cursor-pointer"
+              />
+              <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                {t('taskDrawer.subtaskSkippable')}
+              </span>
+            </label>
+            {!editIsSkippable && (
+              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                {t('taskDrawer.subtaskMandatoryNote')}
+              </span>
+            )}
+          </div>
+
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               type="button"
+              disabled={subtask.is_skippable === false}
               onClick={() => onToggleCancel(!subtask.is_cancelled)}
-              className={`mr-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-                subtask.is_cancelled
-                  ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400'
-                  : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              title={subtask.is_skippable === false ? t('taskDrawer.subtaskNotSkippableTooltip') : undefined}
+              className={`mr-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                subtask.is_skippable === false
+                  ? 'opacity-40 cursor-not-allowed border-slate-200 dark:border-slate-800 text-slate-400'
+                  : subtask.is_cancelled
+                  ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 cursor-pointer'
+                  : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer'
               }`}
             >
               <i className={`pi ${subtask.is_cancelled ? 'pi-undo' : 'pi-ban'} text-[10px]`} />

@@ -54,6 +54,7 @@ data class Subtask(
     val description: String = "",
     @SerialName("is_completed") val isCompleted: Boolean,
     @SerialName("is_cancelled") val isCancelled: Boolean = false,
+    @SerialName("is_skippable") val isSkippable: Boolean = true,
     @SerialName("order_index") val orderIndex: Int = 0,
     @SerialName("due_date") val dueDate: String? = null
 )
@@ -94,7 +95,8 @@ data class TaskCursorResponse(
 data class CreateTaskSubtaskItem(
     val title: String,
     val description: String? = null,
-    @SerialName("due_date") val dueDate: String? = null
+    @SerialName("due_date") val dueDate: String? = null,
+    @SerialName("is_skippable") val isSkippable: Boolean? = true
 )
 
 @Serializable
@@ -135,6 +137,7 @@ data class RecurringSubtaskItem(
     @SerialName("recurring_task_id") val recurringTaskId: Long? = null,
     val title: String,
     val description: String = "",
+    @SerialName("is_skippable") val isSkippable: Boolean = true,
     @SerialName("order_index") val orderIndex: Int = 0
 )
 
@@ -161,6 +164,7 @@ data class RecurringTaskItem(
 @Serializable
 data class CreateRecurringSubtaskItem(
     val title: String,
+    @SerialName("is_skippable") val isSkippable: Boolean? = true,
     @SerialName("order_index") val orderIndex: Int = 0
 )
 
@@ -203,7 +207,8 @@ data class LogProgressRequest(
 data class CreateSubtaskRequest(
     val title: String,
     val description: String? = null,
-    @SerialName("due_date") val dueDate: String? = null
+    @SerialName("due_date") val dueDate: String? = null,
+    @SerialName("is_skippable") val isSkippable: Boolean? = null
 )
 
 @Serializable
@@ -212,7 +217,8 @@ data class UpdateSubtaskRequest(
     val description: String? = null,
     @SerialName("is_completed") val isCompleted: Boolean? = null,
     @SerialName("is_cancelled") val isCancelled: Boolean? = null,
-    @SerialName("due_date") val dueDate: String? = null
+    @SerialName("due_date") val dueDate: String? = null,
+    @SerialName("is_skippable") val isSkippable: Boolean? = null
 )
 
 @Serializable

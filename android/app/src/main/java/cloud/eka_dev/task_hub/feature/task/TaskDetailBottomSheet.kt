@@ -221,6 +221,7 @@ private fun DetailTabContent(
     val context = LocalContext.current
     var newSubtaskText by remember { mutableStateOf("") }
     var newSubtaskDesc by remember { mutableStateOf("") }
+    var newSubtaskSkippable by remember { mutableStateOf(true) }
     var showSubtaskOptions by remember { mutableStateOf(false) }
     var hasSubtaskDueDate by remember { mutableStateOf(false) }
     var subtaskDueDateDate by remember { mutableStateOf("") }
@@ -352,12 +353,14 @@ private fun DetailTabContent(
                                 taskId = task.id,
                                 title = newSubtaskText.trim(),
                                 description = newSubtaskDesc.trim().ifEmpty { null },
-                                dueDate = fullSubtaskDueDate
+                                dueDate = fullSubtaskDueDate,
+                                isSkippable = newSubtaskSkippable
                             )
                             newSubtaskText = ""
                             newSubtaskDesc = ""
                             hasSubtaskDueDate = false
                             subtaskDueDateDate = ""
+                            newSubtaskSkippable = true
                             showSubtaskOptions = false
                         }
                     },
@@ -391,6 +394,19 @@ private fun DetailTabContent(
                     modifier = Modifier.fillMaxWidth(),
                     maxLines = 2
                 )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.subtask_skippable), fontSize = 11.sp)
+                    Switch(
+                        checked = newSubtaskSkippable,
+                        onCheckedChange = { newSubtaskSkippable = it },
+                        modifier = Modifier.scale(0.8f)
+                    )
+                }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -494,6 +510,21 @@ private fun DetailTabContent(
                                 textDecoration = if (subtask.isCompleted || subtask.isCancelled) TextDecoration.LineThrough else TextDecoration.None,
                                 color = if (subtask.isCompleted || subtask.isCancelled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                             )
+                            if (!subtask.isSkippable) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.subtask_mandatory),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
                             if (subtask.isCancelled) {
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Surface(
@@ -539,18 +570,20 @@ private fun DetailTabContent(
                             )
                         }
                         Spacer(modifier = Modifier.width(4.dp))
-                        IconButton(
-                            onClick = { viewModel.toggleSubtaskCancelled(task.id, subtask.id, subtask.isCancelled) },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                if (subtask.isCancelled) Icons.Default.Undo else Icons.Default.Remove,
-                                contentDescription = stringResource(if (subtask.isCancelled) R.string.unskip_subtask else R.string.skip_subtask),
-                                tint = if (subtask.isCancelled) BrandPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                modifier = Modifier.size(16.dp)
-                            )
+                        if (subtask.isCancelled || subtask.isSkippable) {
+                            IconButton(
+                                onClick = { viewModel.toggleSubtaskCancelled(task.id, subtask.id, subtask.isCancelled) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    if (subtask.isCancelled) Icons.Default.Undo else Icons.Default.Remove,
+                                    contentDescription = stringResource(if (subtask.isCancelled) R.string.unskip_subtask else R.string.skip_subtask),
+                                    tint = if (subtask.isCancelled) BrandPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
                         }
-                        Spacer(modifier = Modifier.width(4.dp))
                         IconButton(
                             onClick = { viewModel.deleteSubtask(task.id, subtask.id) },
                             modifier = Modifier.size(24.dp)
@@ -594,13 +627,14 @@ private fun DetailTabContent(
             subtask = st,
             taskDueDate = task.dueDate,
             onDismiss = { editingSubtask = null },
-            onSave = { updatedTitle, updatedDesc, updatedDueDate ->
+            onSave = { updatedTitle, updatedDesc, updatedDueDate, updatedIsSkippable ->
                 viewModel.updateSubtask(
                     taskId = task.id,
                     subtaskId = st.id,
                     title = updatedTitle,
                     description = updatedDesc,
-                    dueDate = updatedDueDate
+                    dueDate = updatedDueDate,
+                    isSkippable = updatedIsSkippable
                 )
                 editingSubtask = null
             }
@@ -1025,11 +1059,12 @@ fun EditSubtaskDialog(
     subtask: Subtask,
     taskDueDate: String?,
     onDismiss: () -> Unit,
-    onSave: (title: String, description: String?, dueDate: String?) -> Unit
+    onSave: (title: String, description: String?, dueDate: String?, isSkippable: Boolean) -> Unit
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf(subtask.title) }
     var description by remember { mutableStateOf(subtask.description) }
+    var isSkippable by remember { mutableStateOf(subtask.isSkippable) }
     var hasDueDate by remember { mutableStateOf(!subtask.dueDate.isNullOrBlank()) }
     var dueDateDate by remember {
         mutableStateOf(
@@ -1066,6 +1101,14 @@ fun EditSubtaskDialog(
                     modifier = Modifier.fillMaxWidth(),
                     maxLines = 3
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.subtask_skippable), fontSize = 13.sp)
+                    Switch(checked = isSkippable, onCheckedChange = { isSkippable = it })
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1124,7 +1167,7 @@ fun EditSubtaskDialog(
                 text = stringResource(R.string.save),
                 enabled = title.isNotBlank(),
                 onClick = {
-                    onSave(title.trim(), description.trim().ifEmpty { null }, fullSubtaskDueDate)
+                    onSave(title.trim(), description.trim().ifEmpty { null }, fullSubtaskDueDate, isSkippable)
                 }
             )
         },

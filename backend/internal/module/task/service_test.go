@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -2509,6 +2510,119 @@ func TestTaskService_ReconcileActiveRecurringTasks(t *testing.T) {
 	if scheduledAt.IsZero() {
 		t.Errorf("expected scheduledAt time to be non-zero")
 	}
+}
+
+func TestTaskService_Subtask_SkippableEnforcement(t *testing.T) {
+	ctx := context.Background()
+	testUserID := "user-uuid-123"
+	taskID := int64(100)
+	subtaskID := int64(200)
+
+	t.Run("cannot cancel non-skippable subtask", func(t *testing.T) {
+		mockRepo := &mockRepository{
+			findByIDFunc: func(ctx context.Context, userID string, id int64) (*TaskResponse, error) {
+				return &TaskResponse{
+					ID:     taskID,
+					UserID: userID,
+					Subtasks: []SubtaskResponse{
+						{
+							ID:          subtaskID,
+							TaskID:      taskID,
+							Title:       "Mandatory Subtask",
+							IsSkippable: false,
+						},
+					},
+				}, nil
+			},
+		}
+
+		svc := NewService(mockRepo, &mockTransactor{})
+		cancelTrue := true
+		_, err := svc.UpdateSubtask(ctx, testUserID, taskID, subtaskID, UpdateSubtaskRequest{
+			IsCancelled: &cancelTrue,
+		})
+		if err == nil {
+			t.Fatal("expected error when cancelling non-skippable subtask, got nil")
+		}
+		if !strings.Contains(err.Error(), "tidak dapat dilewati") {
+			t.Errorf("expected error message to contain 'tidak dapat dilewati', got %v", err)
+		}
+	})
+
+	t.Run("can cancel skippable subtask", func(t *testing.T) {
+		mockRepo := &mockRepository{
+			findByIDFunc: func(ctx context.Context, userID string, id int64) (*TaskResponse, error) {
+				return &TaskResponse{
+					ID:     taskID,
+					UserID: userID,
+					Subtasks: []SubtaskResponse{
+						{
+							ID:          subtaskID,
+							TaskID:      taskID,
+							Title:       "Optional Subtask",
+							IsSkippable: true,
+						},
+					},
+				}, nil
+			},
+			updateSubtaskFunc: func(ctx context.Context, userID string, tID int64, sID int64, req UpdateSubtaskRequest) (*SubtaskResponse, error) {
+				return &SubtaskResponse{
+					ID:          sID,
+					TaskID:      tID,
+					Title:       "Optional Subtask",
+					IsCancelled: true,
+					IsSkippable: true,
+				}, nil
+			},
+			countSubtasksFunc: func(ctx context.Context, tID int64) (int, int, int, error) {
+				return 1, 0, 1, nil
+			},
+			updateFunc: func(ctx context.Context, userID string, id int64, req UpdateTaskRequest) (*TaskResponse, error) {
+				return &TaskResponse{ID: id, Status: "done"}, nil
+			},
+		}
+
+		svc := NewService(mockRepo, &mockTransactor{})
+		cancelTrue := true
+		res, err := svc.UpdateSubtask(ctx, testUserID, taskID, subtaskID, UpdateSubtaskRequest{
+			IsCancelled: &cancelTrue,
+		})
+		if err != nil {
+			t.Fatalf("expected cancel on skippable subtask to succeed, got %v", err)
+		}
+		if res == nil || !res.IsCancelled {
+			t.Errorf("expected subtask to be cancelled")
+		}
+	})
+
+	t.Run("cannot make cancelled subtask non-skippable while still cancelled", func(t *testing.T) {
+		mockRepo := &mockRepository{
+			findByIDFunc: func(ctx context.Context, userID string, id int64) (*TaskResponse, error) {
+				return &TaskResponse{
+					ID:     taskID,
+					UserID: userID,
+					Subtasks: []SubtaskResponse{
+						{
+							ID:          subtaskID,
+							TaskID:      taskID,
+							Title:       "Cancelled Subtask",
+							IsCancelled: true,
+							IsSkippable: true,
+						},
+					},
+				}, nil
+			},
+		}
+
+		svc := NewService(mockRepo, &mockTransactor{})
+		skippableFalse := false
+		_, err := svc.UpdateSubtask(ctx, testUserID, taskID, subtaskID, UpdateSubtaskRequest{
+			IsSkippable: &skippableFalse,
+		})
+		if err == nil {
+			t.Fatal("expected error when setting is_skippable=false on cancelled subtask, got nil")
+		}
+	})
 }
 
 

@@ -659,11 +659,25 @@ public final class TaskViewModel {
     }
 
     @MainActor
-    public func addSubtask(taskId: Int64, title: String, description: String? = nil, dueDate: String? = nil) async -> Bool {
+    public func addSubtask(
+        taskId: Int64,
+        title: String,
+        description: String? = nil,
+        dueDate: String? = nil,
+        isSkippable: Bool? = nil
+    ) async -> Bool {
         let trimmed = title.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return false }
         do {
-            _ = try await apiClient.createSubtask(taskId: taskId, req: CreateSubtaskRequest(title: trimmed, description: description, dueDate: dueDate))
+            _ = try await apiClient.createSubtask(
+                taskId: taskId,
+                req: CreateSubtaskRequest(
+                    title: trimmed,
+                    description: description,
+                    dueDate: dueDate,
+                    isSkippable: isSkippable
+                )
+            )
             AppLogger.success("Subtask created", category: .task, metadata: ["taskId": taskId, "title": trimmed])
             await loadTasks()
             return true
@@ -684,7 +698,8 @@ public final class TaskViewModel {
         isCompleted: Bool? = nil,
         isCancelled: Bool? = nil,
         dueDate: String? = nil,
-        clearDueDate: Bool = false
+        clearDueDate: Bool = false,
+        isSkippable: Bool? = nil
     ) async -> Bool {
         do {
             _ = try await apiClient.updateSubtask(
@@ -696,7 +711,8 @@ public final class TaskViewModel {
                     isCompleted: isCompleted,
                     isCancelled: isCancelled,
                     dueDate: dueDate,
-                    clearDueDate: clearDueDate
+                    clearDueDate: clearDueDate,
+                    isSkippable: isSkippable
                 )
             )
             AppLogger.success("Subtask updated", category: .task, metadata: ["taskId": taskId, "subtaskId": subtaskId])

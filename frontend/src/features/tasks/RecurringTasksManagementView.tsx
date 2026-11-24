@@ -132,8 +132,9 @@ export const RecurringTasksManagementView: React.FC = () => {
   const [formInterval, setFormInterval] = useState<number>(1)
   const [formDueTime, setFormDueTime] = useState<string>('')
   const [formIsActive, setFormIsActive] = useState<boolean>(true)
-  const [formSubtasks, setFormSubtasks] = useState<string[]>([])
+  const [formSubtasks, setFormSubtasks] = useState<Array<{ title: string; is_skippable: boolean }>>([])
   const [newSubtaskInput, setNewSubtaskInput] = useState('')
+  const [newSubtaskSkippable, setNewSubtaskSkippable] = useState(true)
   const [formTouched, setFormTouched] = useState(false)
   const [formErrorMsg, setFormErrorMsg] = useState<string | null>(null)
 
@@ -149,6 +150,7 @@ export const RecurringTasksManagementView: React.FC = () => {
     setFormIsActive(true)
     setFormSubtasks([])
     setNewSubtaskInput('')
+    setNewSubtaskSkippable(true)
     setFormTouched(false)
     setFormErrorMsg(null)
     setIsModalOpen(true)
@@ -164,8 +166,9 @@ export const RecurringTasksManagementView: React.FC = () => {
     setFormInterval(template.recurrence_interval || 1)
     setFormDueTime(formatDueTimeDisplay(template.due_time))
     setFormIsActive(template.is_active)
-    setFormSubtasks(template.subtasks?.map((s) => s.title) || [])
+    setFormSubtasks(template.subtasks?.map((s) => ({ title: s.title, is_skippable: s.is_skippable ?? true })) || [])
     setNewSubtaskInput('')
+    setNewSubtaskSkippable(true)
     setFormTouched(false)
     setFormErrorMsg(null)
     setIsModalOpen(true)
@@ -174,8 +177,17 @@ export const RecurringTasksManagementView: React.FC = () => {
   const handleAddSubtask = (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!newSubtaskInput.trim()) return
-    setFormSubtasks([...formSubtasks, newSubtaskInput.trim()])
+    setFormSubtasks([...formSubtasks, { title: newSubtaskInput.trim(), is_skippable: newSubtaskSkippable }])
     setNewSubtaskInput('')
+    setNewSubtaskSkippable(true)
+  }
+
+  const handleToggleSubtaskSkippable = (index: number) => {
+    setFormSubtasks(
+      formSubtasks.map((st, i) =>
+        i === index ? { ...st, is_skippable: !st.is_skippable } : st
+      )
+    )
   }
 
   const handleRemoveSubtask = (index: number) => {
@@ -189,7 +201,8 @@ export const RecurringTasksManagementView: React.FC = () => {
     if (!formTitle.trim()) return
 
     const subtaskPayload = formSubtasks.map((st, idx) => ({
-      title: st,
+      title: st.title,
+      is_skippable: st.is_skippable,
       order_index: idx
     }))
 
@@ -819,47 +832,83 @@ export const RecurringTasksManagementView: React.FC = () => {
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <i className="pi pi-check-square text-xs text-indigo-500 dark:text-indigo-400 shrink-0" />
                           <span className="truncate text-slate-800 dark:text-slate-200">
-                            {st}
+                            {st.title}
                           </span>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSubtask(idx)}
-                          className="p-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 opacity-70 group-hover:opacity-100 transition-opacity cursor-pointer"
-                          title="Hapus subtask"
-                        >
-                          <i className="pi pi-times text-[10px]" />
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSubtaskSkippable(idx)}
+                            title={st.is_skippable ? t('recurring.form.subtaskSkippableTooltip') : t('recurring.form.subtaskMandatoryTooltip')}
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors cursor-pointer flex items-center gap-1 ${
+                              st.is_skippable
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800'
+                            }`}
+                          >
+                            <i className={`pi ${st.is_skippable ? 'pi-check' : 'pi-lock'} text-[8px]`} />
+                            {st.is_skippable ? t('recurring.form.skippableBadge') : t('recurring.form.mandatoryBadge')}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSubtask(idx)}
+                            className="p-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 opacity-70 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            title="Hapus subtask"
+                          >
+                            <i className="pi pi-times text-[10px]" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
 
                 {/* Add Subtask Input */}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newSubtaskInput}
-                    onChange={(e) => setNewSubtaskInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleAddSubtask(e)
-                      }
-                    }}
-                    placeholder={t('recurring.form.subtaskPlaceholder')}
-                    className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-none transition-colors"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleAddSubtask()}
-                    disabled={!newSubtaskInput.trim()}
-                    className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 disabled:opacity-50 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <i className="pi pi-plus text-[10px]" />
-                    {t('recurring.form.addSubtaskBtn')}
-                  </button>
+                <div className="space-y-1.5">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newSubtaskInput}
+                      onChange={(e) => setNewSubtaskInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAddSubtask(e)
+                        }
+                      }}
+                      placeholder={t('recurring.form.subtaskPlaceholder')}
+                      className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-none transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddSubtask()}
+                      disabled={!newSubtaskInput.trim()}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 disabled:opacity-50 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <i className="pi pi-plus text-[10px]" />
+                      {t('recurring.form.addSubtaskBtn')}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between px-0.5">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={newSubtaskSkippable}
+                        onChange={(e) => setNewSubtaskSkippable(e.target.checked)}
+                        className="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-indigo-600 focus:ring-0 cursor-pointer"
+                      />
+                      <span className="text-[11px] text-slate-600 dark:text-slate-400">
+                        {t('recurring.form.subtaskSkippableLabel')}
+                      </span>
+                    </label>
+                    {!newSubtaskSkippable && (
+                      <span className="text-[10px] text-rose-500 dark:text-rose-400 font-medium">
+                        {t('recurring.form.subtaskMandatoryNote')}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 

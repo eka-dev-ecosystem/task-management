@@ -141,6 +141,7 @@ public struct Subtask: Codable, Identifiable, Sendable, Equatable {
     public var description: String?
     public var isCompleted: Bool
     public var isCancelled: Bool
+    public var isSkippable: Bool
     public let orderIndex: Int
     public let dueDate: String?
 
@@ -151,6 +152,7 @@ public struct Subtask: Codable, Identifiable, Sendable, Equatable {
         description: String? = nil,
         isCompleted: Bool,
         isCancelled: Bool = false,
+        isSkippable: Bool = true,
         orderIndex: Int,
         dueDate: String? = nil
     ) {
@@ -160,6 +162,7 @@ public struct Subtask: Codable, Identifiable, Sendable, Equatable {
         self.description = description
         self.isCompleted = isCompleted
         self.isCancelled = isCancelled
+        self.isSkippable = isSkippable
         self.orderIndex = orderIndex
         self.dueDate = dueDate
     }
@@ -169,6 +172,7 @@ public struct Subtask: Codable, Identifiable, Sendable, Equatable {
         case taskId = "task_id"
         case isCompleted = "is_completed"
         case isCancelled = "is_cancelled"
+        case isSkippable = "is_skippable"
         case orderIndex = "order_index"
         case dueDate = "due_date"
     }
@@ -181,6 +185,7 @@ public struct Subtask: Codable, Identifiable, Sendable, Equatable {
         description = try container.decodeIfPresent(String.self, forKey: .description)
         isCompleted = try container.decode(Bool.self, forKey: .isCompleted)
         isCancelled = try container.decodeIfPresent(Bool.self, forKey: .isCancelled) ?? false
+        isSkippable = try container.decodeIfPresent(Bool.self, forKey: .isSkippable) ?? true
         orderIndex = try container.decode(Int.self, forKey: .orderIndex)
         dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
     }
@@ -291,12 +296,37 @@ public struct RecurringSubtaskItem: Codable, Identifiable, Sendable {
     public let id: Int64
     public let recurringTaskId: Int64
     public var title: String
+    public var isSkippable: Bool
     public var orderIndex: Int
+
+    public init(
+        id: Int64,
+        recurringTaskId: Int64,
+        title: String,
+        isSkippable: Bool = true,
+        orderIndex: Int
+    ) {
+        self.id = id
+        self.recurringTaskId = recurringTaskId
+        self.title = title
+        self.isSkippable = isSkippable
+        self.orderIndex = orderIndex
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, title
         case recurringTaskId = "recurring_task_id"
+        case isSkippable = "is_skippable"
         case orderIndex = "order_index"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int64.self, forKey: .id)
+        recurringTaskId = try container.decode(Int64.self, forKey: .recurringTaskId)
+        title = try container.decode(String.self, forKey: .title)
+        isSkippable = try container.decodeIfPresent(Bool.self, forKey: .isSkippable) ?? true
+        orderIndex = try container.decode(Int.self, forKey: .orderIndex)
     }
 }
 
@@ -336,15 +366,18 @@ public struct RecurringTaskItem: Codable, Identifiable, Sendable {
 
 public struct CreateRecurringSubtaskItem: Codable, Sendable {
     public let title: String
+    public let isSkippable: Bool?
     public let orderIndex: Int
 
-    public init(title: String, orderIndex: Int) {
+    public init(title: String, isSkippable: Bool? = true, orderIndex: Int) {
         self.title = title
+        self.isSkippable = isSkippable
         self.orderIndex = orderIndex
     }
 
     enum CodingKeys: String, CodingKey {
         case title
+        case isSkippable = "is_skippable"
         case orderIndex = "order_index"
     }
 }
@@ -454,22 +487,26 @@ public struct CreateTaskSubtaskItem: Codable, Identifiable, Sendable, Equatable 
     public var title: String
     public var description: String?
     public var dueDate: String?
+    public var isSkippable: Bool
 
     public init(
         id: UUID = UUID(),
         title: String,
         description: String? = nil,
-        dueDate: String? = nil
+        dueDate: String? = nil,
+        isSkippable: Bool = true
     ) {
         self.id = id
         self.title = title
         self.description = description
         self.dueDate = dueDate
+        self.isSkippable = isSkippable
     }
 
     enum CodingKeys: String, CodingKey {
         case title, description
         case dueDate = "due_date"
+        case isSkippable = "is_skippable"
     }
 
     public init(from decoder: Decoder) throws {
@@ -478,6 +515,7 @@ public struct CreateTaskSubtaskItem: Codable, Identifiable, Sendable, Equatable 
         self.title = try container.decode(String.self, forKey: .title)
         self.description = try container.decodeIfPresent(String.self, forKey: .description)
         self.dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
+        self.isSkippable = try container.decodeIfPresent(Bool.self, forKey: .isSkippable) ?? true
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -485,6 +523,7 @@ public struct CreateTaskSubtaskItem: Codable, Identifiable, Sendable, Equatable 
         try container.encode(title, forKey: .title)
         try container.encodeIfPresent(description, forKey: .description)
         try container.encodeIfPresent(dueDate, forKey: .dueDate)
+        try container.encode(isSkippable, forKey: .isSkippable)
     }
 }
 
@@ -694,16 +733,19 @@ public struct CreateSubtaskRequest: Codable {
     public let title: String
     public let description: String?
     public let dueDate: String?
+    public let isSkippable: Bool?
 
-    public init(title: String, description: String? = nil, dueDate: String? = nil) {
+    public init(title: String, description: String? = nil, dueDate: String? = nil, isSkippable: Bool? = nil) {
         self.title = title
         self.description = description
         self.dueDate = dueDate
+        self.isSkippable = isSkippable
     }
 
     enum CodingKeys: String, CodingKey {
         case title, description
         case dueDate = "due_date"
+        case isSkippable = "is_skippable"
     }
 }
 
@@ -714,6 +756,7 @@ public struct UpdateSubtaskRequest: Codable {
     public let isCancelled: Bool?
     public let dueDate: String?
     public let clearDueDate: Bool
+    public let isSkippable: Bool?
 
     public init(
         title: String? = nil,
@@ -721,7 +764,8 @@ public struct UpdateSubtaskRequest: Codable {
         isCompleted: Bool? = nil,
         isCancelled: Bool? = nil,
         dueDate: String? = nil,
-        clearDueDate: Bool = false
+        clearDueDate: Bool = false,
+        isSkippable: Bool? = nil
     ) {
         self.title = title
         self.description = description
@@ -729,6 +773,7 @@ public struct UpdateSubtaskRequest: Codable {
         self.isCancelled = isCancelled
         self.dueDate = dueDate
         self.clearDueDate = clearDueDate
+        self.isSkippable = isSkippable
     }
 
     enum CodingKeys: String, CodingKey {
@@ -736,6 +781,7 @@ public struct UpdateSubtaskRequest: Codable {
         case isCompleted = "is_completed"
         case isCancelled = "is_cancelled"
         case dueDate = "due_date"
+        case isSkippable = "is_skippable"
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -744,6 +790,7 @@ public struct UpdateSubtaskRequest: Codable {
         try container.encodeIfPresent(description, forKey: .description)
         try container.encodeIfPresent(isCompleted, forKey: .isCompleted)
         try container.encodeIfPresent(isCancelled, forKey: .isCancelled)
+        try container.encodeIfPresent(isSkippable, forKey: .isSkippable)
         if clearDueDate {
             try container.encodeNil(forKey: .dueDate)
         } else {
@@ -759,6 +806,7 @@ public struct UpdateSubtaskRequest: Codable {
         isCancelled = try container.decodeIfPresent(Bool.self, forKey: .isCancelled)
         dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
         clearDueDate = false
+        isSkippable = try container.decodeIfPresent(Bool.self, forKey: .isSkippable)
     }
 }
 

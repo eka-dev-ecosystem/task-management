@@ -78,6 +78,8 @@
     <string name="subtask_skipped">Skipped</string>
     <string name="skip_subtask">Skip Subtask</string>
     <string name="unskip_subtask">Reactivate Subtask</string>
+    <string name="subtask_skippable">Skippable</string>
+    <string name="subtask_mandatory">Required</string>
     <string name="tab_details_subtasks">Details &amp; Subtasks</string>
     <string name="tab_activity_logs">Activity Logs</string>
     <string name="activity_logs_title">Activity History</string>

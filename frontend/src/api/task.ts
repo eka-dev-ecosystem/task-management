@@ -32,7 +32,7 @@ export const taskApi = {
 
   createSubtask: (
     taskId: number,
-    payload: { title: string; description?: string; due_date?: string | null } | string
+    payload: { title: string; description?: string; due_date?: string | null; is_skippable?: boolean } | string
   ) => {
     const body = typeof payload === 'string' ? { title: payload } : payload
     return apiClient.post<Subtask>(`/api/v1/tasks/${taskId}/subtasks`, body)
@@ -46,6 +46,7 @@ export const taskApi = {
       description?: string
       is_completed?: boolean
       is_cancelled?: boolean
+      is_skippable?: boolean
       due_date?: string | null
     }
   ) => apiClient.put<Subtask>(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`, payload),

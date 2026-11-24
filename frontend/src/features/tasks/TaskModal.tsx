@@ -11,6 +11,7 @@ import type { RecurrencePattern, TaskPriority, TaskStatus } from '@/types'
 interface LocalSubtask {
   id: string
   title: string
+  is_skippable?: boolean
 }
 
 export const TaskModal: React.FC = () => {
@@ -30,6 +31,7 @@ export const TaskModal: React.FC = () => {
   const [tagsInput, setTagsInput] = useState('')
   const [subtasks, setSubtasks] = useState<LocalSubtask[]>([])
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
+  const [newSubtaskSkippable, setNewSubtaskSkippable] = useState(true)
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>('daily')
   const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1)
@@ -58,6 +60,7 @@ export const TaskModal: React.FC = () => {
     setTagsInput('')
     setSubtasks([])
     setNewSubtaskTitle('')
+    setNewSubtaskSkippable(true)
     setIsRecurring(false)
     setRecurrencePattern('daily')
     setRecurrenceInterval(1)
@@ -71,9 +74,22 @@ export const TaskModal: React.FC = () => {
     if (!newSubtaskTitle.trim()) return
     setSubtasks((prev) => [
       ...prev,
-      { id: `st_${Date.now()}_${prev.length}`, title: newSubtaskTitle.trim() }
+      {
+        id: `st_${Date.now()}_${prev.length}`,
+        title: newSubtaskTitle.trim(),
+        is_skippable: newSubtaskSkippable
+      }
     ])
     setNewSubtaskTitle('')
+    setNewSubtaskSkippable(true)
+  }
+
+  const handleToggleSubtaskSkippable = (id: string) => {
+    setSubtasks((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, is_skippable: !(item.is_skippable ?? true) } : item
+      )
+    )
   }
 
   const handleRemoveSubtask = (idToRemove: string) => {
@@ -91,9 +107,15 @@ export const TaskModal: React.FC = () => {
       .map((t) => t.trim().toLowerCase())
       .filter(Boolean)
 
-    const finalSubtasks = subtasks.map((item) => item.title)
+    const finalSubtasks = subtasks.map((item) => ({
+      title: item.title,
+      is_skippable: item.is_skippable ?? true
+    }))
     if (newSubtaskTitle.trim()) {
-      finalSubtasks.push(newSubtaskTitle.trim())
+      finalSubtasks.push({
+        title: newSubtaskTitle.trim(),
+        is_skippable: newSubtaskSkippable
+      })
     }
 
     try {
@@ -496,44 +518,80 @@ export const TaskModal: React.FC = () => {
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSubtask(st.id)}
-                      data-pr-tooltip={t('taskDrawer.deleteSubtaskTooltip')}
-                      className="p-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 opacity-70 group-hover:opacity-100 transition-opacity cursor-pointer"
-                    >
-                      <i className="pi pi-times text-[10px]" />
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSubtaskSkippable(st.id)}
+                        title={(st.is_skippable ?? true) ? t('recurring.form.subtaskSkippableTooltip') : t('recurring.form.subtaskMandatoryTooltip')}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors cursor-pointer flex items-center gap-1 ${
+                          (st.is_skippable ?? true)
+                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                            : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800'
+                        }`}
+                      >
+                        <i className={`pi ${(st.is_skippable ?? true) ? 'pi-check' : 'pi-lock'} text-[8px]`} />
+                        {(st.is_skippable ?? true) ? t('recurring.form.skippableBadge') : t('recurring.form.mandatoryBadge')}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSubtask(st.id)}
+                        data-pr-tooltip={t('taskDrawer.deleteSubtaskTooltip')}
+                        className="p-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 opacity-70 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      >
+                        <i className="pi pi-times text-[10px]" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
 
             {/* Add Subtask Input */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newSubtaskTitle}
-                onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleAddSubtask()
-                  }
-                }}
-                placeholder={t('taskDrawer.addSubtaskPlaceholder')}
-                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-none transition-colors"
-              />
-              <button
-                type="button"
-                onClick={handleAddSubtask}
-                disabled={!newSubtaskTitle.trim()}
-                data-pr-tooltip={t('taskDrawer.addSubtaskTooltip')}
-                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 disabled:opacity-50 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
-              >
-                <i className="pi pi-plus text-[10px]" />
-                {t('taskDrawer.add')}
-              </button>
+            <div className="space-y-1.5">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newSubtaskTitle}
+                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddSubtask()
+                    }
+                  }}
+                  placeholder={t('taskDrawer.addSubtaskPlaceholder')}
+                  className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-none transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddSubtask}
+                  disabled={!newSubtaskTitle.trim()}
+                  data-pr-tooltip={t('taskDrawer.addSubtaskTooltip')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 disabled:opacity-50 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <i className="pi pi-plus text-[10px]" />
+                  {t('taskDrawer.add')}
+                </button>
+              </div>
+              <div className="flex items-center justify-between px-0.5">
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newSubtaskSkippable}
+                    onChange={(e) => setNewSubtaskSkippable(e.target.checked)}
+                    className="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-indigo-600 focus:ring-0 cursor-pointer"
+                  />
+                  <span className="text-[11px] text-slate-600 dark:text-slate-400">
+                    {t('recurring.form.subtaskSkippableLabel')}
+                  </span>
+                </label>
+                {!newSubtaskSkippable && (
+                  <span className="text-[10px] text-rose-500 dark:text-rose-400 font-medium">
+                    {t('recurring.form.subtaskMandatoryNote')}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

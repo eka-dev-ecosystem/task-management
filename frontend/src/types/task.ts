@@ -71,6 +71,7 @@ export interface Subtask {
   description?: string
   is_completed: boolean
   is_cancelled?: boolean
+  is_skippable?: boolean
   order_index: number
   due_date?: string | null
   created_at: string
@@ -121,7 +122,7 @@ export interface CreateTaskPayload {
   tags?: string[]
   project_id?: number | null
   source_note_id?: number
-  subtasks?: string[]
+  subtasks?: Array<string | { title: string; description?: string; due_date?: string | null; is_skippable?: boolean }>
   is_recurring?: boolean
   recurrence_pattern?: RecurrencePattern
   recurrence_interval?: number
@@ -150,6 +151,8 @@ export interface RecurringSubtask {
   id: number
   recurring_task_id: number
   title: string
+  description?: string
+  is_skippable?: boolean
   order_index: number
   created_at: string
 }
@@ -186,7 +189,7 @@ export interface CreateRecurringTaskPayload {
   recurrence_end_date?: string
   due_time?: string
   is_active?: boolean
-  subtasks?: Array<{ title: string; order_index: number }>
+  subtasks?: Array<{ title: string; description?: string; is_skippable?: boolean; order_index: number }>
 }
 
 export interface UpdateRecurringTaskPayload {
@@ -200,7 +203,7 @@ export interface UpdateRecurringTaskPayload {
   recurrence_end_date?: string | null
   due_time?: string | null
   is_active?: boolean
-  subtasks?: Array<{ title: string; order_index: number }>
+  subtasks?: Array<{ title: string; description?: string; is_skippable?: boolean; order_index: number }>
 }
 
 export interface LogProgressPayload {

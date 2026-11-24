@@ -129,6 +129,7 @@ func (s *service) Create(ctx context.Context, userID string, req CreateTaskReque
 				subItems[i] = CreateRecurringSubtaskItem{
 					Title:       s.Title,
 					Description: s.Description,
+					IsSkippable: s.IsSkippable,
 					OrderIndex:  i,
 				}
 			}
@@ -724,10 +725,24 @@ func (s *service) UpdateSubtask(ctx context.Context, userID string, taskID int64
 			return errors.BadRequest("Subtask due date cannot exceed task due date")
 		}
 		var oldTitle string
+		var existingSubtask *SubtaskResponse
 		for _, st := range entity.Subtasks {
 			if st.ID == subtaskID {
 				oldTitle = st.Title
+				existingSubtask = &st
 				break
+			}
+		}
+		if existingSubtask != nil {
+			isSkippable := existingSubtask.IsSkippable
+			if req.IsSkippable != nil {
+				isSkippable = *req.IsSkippable
+			}
+			if req.IsCancelled != nil && *req.IsCancelled && !isSkippable {
+				return errors.BadRequest("Subtask ini wajib dan tidak dapat dilewati")
+			}
+			if req.IsSkippable != nil && !*req.IsSkippable && (req.IsCancelled == nil && existingSubtask.IsCancelled) {
+				return errors.BadRequest("Subtask yang dibatalkan tidak dapat diubah menjadi wajib tanpa membatalkan status lewati terlebih dahulu")
 			}
 		}
 		var err2 error

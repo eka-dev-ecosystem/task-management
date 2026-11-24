@@ -897,6 +897,7 @@ fun CreateTaskDialog(
     val subtasks = remember { mutableStateListOf<CreateTaskSubtaskItem>() }
     var newSubtaskTitle by remember { mutableStateOf("") }
     var newSubtaskDesc by remember { mutableStateOf("") }
+    var newSubtaskSkippable by remember { mutableStateOf(true) }
     var showSubtaskOptions by remember { mutableStateOf(false) }
     var hasSubtaskDueDate by remember { mutableStateOf(false) }
     var subtaskDueDateDate by remember { mutableStateOf("") }
@@ -1090,6 +1091,21 @@ fun CreateTaskDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(st.title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            if (st.isSkippable == false) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.subtask_mandatory),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
                             if (!st.description.isNullOrBlank()) {
                                 Text(st.description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -1129,13 +1145,15 @@ fun CreateTaskDialog(
                                         CreateTaskSubtaskItem(
                                             title = newSubtaskTitle.trim(),
                                             description = newSubtaskDesc.trim().ifEmpty { null },
-                                            dueDate = fullSubtaskDueDate
+                                            dueDate = fullSubtaskDueDate,
+                                            isSkippable = newSubtaskSkippable
                                         )
                                     )
                                     newSubtaskTitle = ""
                                     newSubtaskDesc = ""
                                     hasSubtaskDueDate = false
                                     subtaskDueDateDate = ""
+                                    newSubtaskSkippable = true
                                     showSubtaskOptions = false
                                 }
                             },
@@ -1166,6 +1184,19 @@ fun CreateTaskDialog(
                             modifier = Modifier.fillMaxWidth(),
                             maxLines = 2
                         )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.subtask_skippable), fontSize = 11.sp)
+                            Switch(
+                                checked = newSubtaskSkippable,
+                                onCheckedChange = { newSubtaskSkippable = it },
+                                modifier = Modifier.scale(0.8f)
+                            )
+                        }
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1259,8 +1290,9 @@ fun CreateRecurringTaskDialog(
     var hasDueTime by remember { mutableStateOf(false) }
     var dueTime by remember { mutableStateOf("09:00") }
 
-    val subtasks = remember { mutableStateListOf<String>() }
+    val subtasks = remember { mutableStateListOf<CreateRecurringSubtaskItem>() }
     var newSubtaskText by remember { mutableStateOf("") }
+    var newSubtaskSkippable by remember { mutableStateOf(true) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1427,33 +1459,71 @@ fun CreateRecurringTaskDialog(
                             .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(st, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Text(st.title, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = if (st.isSkippable == false) MaterialTheme.colorScheme.error.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.clickable {
+                                val current = subtasks[idx]
+                                subtasks[idx] = current.copy(isSkippable = !(current.isSkippable ?: true))
+                            }
+                        ) {
+                            Text(
+                                text = if (st.isSkippable == false) stringResource(R.string.subtask_mandatory) else stringResource(R.string.subtask_skippable),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (st.isSkippable == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                         IconButton(onClick = { subtasks.removeAt(idx) }, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = newSubtaskText,
-                        onValueChange = { newSubtaskText = it },
-                        placeholder = { Text(stringResource(R.string.add_subtask_placeholder), fontSize = 12.sp) },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    IconButton(
-                        onClick = {
-                            if (newSubtaskText.isNotBlank()) {
-                                subtasks.add(newSubtaskText.trim())
-                                newSubtaskText = ""
-                            }
-                        },
-                        enabled = newSubtaskText.isNotBlank()
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = newSubtaskText,
+                            onValueChange = { newSubtaskText = it },
+                            placeholder = { Text(stringResource(R.string.add_subtask_placeholder), fontSize = 12.sp) },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        IconButton(
+                            onClick = {
+                                if (newSubtaskText.isNotBlank()) {
+                                    subtasks.add(
+                                        CreateRecurringSubtaskItem(
+                                            title = newSubtaskText.trim(),
+                                            isSkippable = newSubtaskSkippable,
+                                            orderIndex = subtasks.size
+                                        )
+                                    )
+                                    newSubtaskText = ""
+                                    newSubtaskSkippable = true
+                                }
+                            },
+                            enabled = newSubtaskText.isNotBlank()
+                        ) {
+                            Icon(Icons.Default.AddCircle, contentDescription = null, tint = BrandPrimary)
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.AddCircle, contentDescription = null, tint = BrandPrimary)
+                        Text(stringResource(R.string.subtask_skippable), fontSize = 11.sp)
+                        Switch(
+                            checked = newSubtaskSkippable,
+                            onCheckedChange = { newSubtaskSkippable = it },
+                            modifier = Modifier.scale(0.8f)
+                        )
                     }
                 }
             }
@@ -1464,7 +1534,7 @@ fun CreateRecurringTaskDialog(
                 enabled = title.isNotBlank(),
                 onClick = {
                     val subtaskItems = if (subtasks.isEmpty()) null else subtasks.mapIndexed { idx, s ->
-                        CreateRecurringSubtaskItem(title = s, orderIndex = idx)
+                        s.copy(orderIndex = idx)
                     }
                     val req = CreateRecurringTaskRequest(
                         title = title.trim(),
@@ -1517,11 +1587,14 @@ fun EditRecurringTaskDialog(
     }
 
     val subtasks = remember {
-        mutableStateListOf<String>().apply {
-            addAll(item.subtasks.map { it.title })
+        mutableStateListOf<CreateRecurringSubtaskItem>().apply {
+            addAll(item.subtasks.mapIndexed { idx, s ->
+                CreateRecurringSubtaskItem(title = s.title, isSkippable = s.isSkippable, orderIndex = idx)
+            })
         }
     }
     var newSubtaskText by remember { mutableStateOf("") }
+    var newSubtaskSkippable by remember { mutableStateOf(true) }
     var showDeleteAlert by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -1699,33 +1772,71 @@ fun EditRecurringTaskDialog(
                             .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(st, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Text(st.title, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = if (st.isSkippable == false) MaterialTheme.colorScheme.error.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.clickable {
+                                val current = subtasks[idx]
+                                subtasks[idx] = current.copy(isSkippable = !(current.isSkippable ?: true))
+                            }
+                        ) {
+                            Text(
+                                text = if (st.isSkippable == false) stringResource(R.string.subtask_mandatory) else stringResource(R.string.subtask_skippable),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (st.isSkippable == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                         IconButton(onClick = { subtasks.removeAt(idx) }, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = newSubtaskText,
-                        onValueChange = { newSubtaskText = it },
-                        placeholder = { Text(stringResource(R.string.add_subtask_placeholder), fontSize = 12.sp) },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    IconButton(
-                        onClick = {
-                            if (newSubtaskText.isNotBlank()) {
-                                subtasks.add(newSubtaskText.trim())
-                                newSubtaskText = ""
-                            }
-                        },
-                        enabled = newSubtaskText.isNotBlank()
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = newSubtaskText,
+                            onValueChange = { newSubtaskText = it },
+                            placeholder = { Text(stringResource(R.string.add_subtask_placeholder), fontSize = 12.sp) },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        IconButton(
+                            onClick = {
+                                if (newSubtaskText.isNotBlank()) {
+                                    subtasks.add(
+                                        CreateRecurringSubtaskItem(
+                                            title = newSubtaskText.trim(),
+                                            isSkippable = newSubtaskSkippable,
+                                            orderIndex = subtasks.size
+                                        )
+                                    )
+                                    newSubtaskText = ""
+                                    newSubtaskSkippable = true
+                                }
+                            },
+                            enabled = newSubtaskText.isNotBlank()
+                        ) {
+                            Icon(Icons.Default.AddCircle, contentDescription = null, tint = BrandPrimary)
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.AddCircle, contentDescription = null, tint = BrandPrimary)
+                        Text(stringResource(R.string.subtask_skippable), fontSize = 11.sp)
+                        Switch(
+                            checked = newSubtaskSkippable,
+                            onCheckedChange = { newSubtaskSkippable = it },
+                            modifier = Modifier.scale(0.8f)
+                        )
                     }
                 }
 
@@ -1748,7 +1859,7 @@ fun EditRecurringTaskDialog(
                 enabled = title.isNotBlank(),
                 onClick = {
                     val subtaskItems = subtasks.mapIndexed { idx, s ->
-                        CreateRecurringSubtaskItem(title = s, orderIndex = idx)
+                        s.copy(orderIndex = idx)
                     }
                     val req = UpdateRecurringTaskRequest(
                         title = title.trim(),

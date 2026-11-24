@@ -121,6 +121,8 @@
 "tasks.subtasksCountShort" = "%lld subtasks";
 "tasks.updateSubtaskFailed" = "Failed to update subtask";
 "tasks.addSubtaskFailed" = "Failed to add subtask";
+"tasks.subtaskSkippable" = "Skippable";
+"tasks.subtaskMandatory" = "Required";
 "tasks.deleteRecurring" = "Delete Template";
 
 /* Projects */
